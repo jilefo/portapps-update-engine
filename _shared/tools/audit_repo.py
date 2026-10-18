@@ -15,7 +15,9 @@ r"""audit_repo.py —— CI 友好的仓库结构自检（不依赖任何第三�
   C Launcher ini 存在 + 可解析 + [Launch]ProgramExecutable 非空
                 + [Environment] APPDATA/LOCALAPPDATA 指向 %PAL:DataDir%
   D Custom.nsh   UTF-8 无 BOM（有 BOM → NSIS Invalid command）
-                + 无 PowerShell 内联病态（'' 引号 / 裸 $变量 / ^| 管道）
+                + 无 PowerShell 病态（裸 $变量 / '' / ^| / -Command 内联回归）
+                  扫描实现见 check_custom_nsh.py（句柄感知 + 目标后缀分类，
+                  勿在此处重写过滤条件，否则会再次与真实形态漂移）
   E 编码铁律     含非 ASCII 的 Launcher ini 必须 UTF-16LE
 
 退出码：0 = 全通过；1 = 有硬失败。
@@ -27,6 +29,14 @@ import re
 import sys
 from pathlib import Path
 
+# >>> 复用 check_custom_nsh 的病态扫描器（单一事实来源，避免两份实现再次漂移）。
+#     本文件以脚本方式运行时 sys.path[0] 即本目录；被当作模块 import 时补一次。
+_TOOLS_DIR = Path(__file__).resolve().parent
+if str(_TOOLS_DIR) not in sys.path:
+    sys.path.insert(0, str(_TOOLS_DIR))
+from check_custom_nsh import scan_file as _scan_nsh  # noqa: E402
+# <<<
+
 # >>> 路径自适应：仓库根由本文件位置推导，可用 PORTABLEAPPS_ROOT 覆盖
 REPO_ROOT = os.environ.get("PORTABLEAPPS_ROOT") or str(
     Path(__file__).resolve().parents[2])
@@ -35,8 +45,6 @@ REPO_ROOT = os.environ.get("PORTABLEAPPS_ROOT") or str(
 META_FILES = ["LICENSE", "README.md", ".gitignore", "CHANGELOG.md",
               "CONTRIBUTING.md", "CODE_OF_CONDUCT.md", ".editorconfig"]
 META_DIRS = ["docs", ".github"]
-
-BAD_VAR_RE = re.compile(r"\$(l|t|p|tp|own|lt|k|v|root|n)(?![A-Za-z_])")
 
 
 def sniff(path):
@@ -71,6 +79,33 @@ def packages():
     return sorted(p for p in root.iterdir()
                   if p.is_dir() and p.name.endswith("Portable")
                   and not p.name.startswith(("_", ".")))
+
+
+def tree_populated(pkg, tree):
+    """该树是否已装配（有 AppInfo/Launcher 等真实构建产物）。
+
+    clone / CI 环境里 <Pkg>/dist/ 下只有 update.py 与 version.json
+    （程序二进制被 .gitignore 排除），强行审计 dist 树会全员误报
+    「缺 appinfo.ini」——这正是开源后 CI 假红的根因。
+    """
+    for base in (pkg / tree / "App", pkg / tree / pkg.name / "App"):
+        if (base / "AppInfo" / "Launcher").is_dir() \
+                or (base / "AppInfo" / "appinfo.ini").is_file():
+            return True
+    return False
+
+
+def resolve_trees(pkg, requested, explicit):
+    """按包解析真正要审计的树。
+
+    - portableapps 恒审：它是随 git 分发的配方，任何 clone 里都在；
+    - dist 仅在本机已装配时才审，克隆里跳过（但不静默，见 main 的汇报）；
+    - 显式 --tree 指定时不自动跳过，缺什么报什么（留给本机审计）。
+    """
+    if explicit:
+        return list(requested)
+    return [t for t in requested
+            if t == "portableapps" or tree_populated(pkg, t)]
 
 
 def check_meta(pkg, fails):
@@ -193,38 +228,42 @@ def check_custom_nsh(pkg, tree, fails):
     if b"\x00" in raw[:64]:
         fails.append("[%s] Custom.nsh 疑似 UTF-16（必须 UTF-8 无 BOM）" % tree)
         return
-    text = raw.decode("utf-8", errors="replace")
-    hits = []
-    for i, ln in enumerate(text.splitlines(), 1):
-        if "ExecToStack" not in ln or "Command" not in ln:
-            continue
-        bad = []
-        if "''" in ln:
-            bad.append("''引号")
-        if BAD_VAR_RE.search(ln.replace("$$", "")):
-            bad.append("裸$变量")
-        if "^|" in ln:
-            bad.append("^|管道")
-        if bad:
-            hits.append((i, bad))
+    # 病态扫描复用 check_custom_nsh.scan_file（句柄感知 + 目标后缀分类）。
+    # 注意：勿在这里重写一份过滤条件——曾经就是因为只有
+    # "ExecToStack + Command" 这一份实现，而全仓已改成 -File 形态，
+    # 导致这道检查扫的是空集，长期假绿。
+    hits, _stats = _scan_nsh(p)
     if hits:
-        fails.append("[%s] Custom.nsh 病态 %d 处: %s" % (tree, len(hits), hits[:3]))
+        fails.append("[%s] Custom.nsh 病态 %d 处: %s"
+                     % (tree, len(hits), [(n, x[:1]) for n, x in hits[:3]]))
 
 
 def main():
+    explicit = None
     trees = ["dist", "portableapps"]
     if "--tree" in sys.argv:
         t = sys.argv[sys.argv.index("--tree") + 1]
-        trees = [t] if t in trees else ["dist", "portableapps"]
+        if t in trees:
+            explicit, trees = t, [t]
     pkgs = packages()
+    if not pkgs:
+        print("!! 未找到任何 *Portable 包目录（仓库根：%s）" % REPO_ROOT)
+        print("!! 0 个包被审计 —— 本工具拒绝在这种状态下判绿，按失败处理")
+        return 1
     all_fail, all_note = {}, {}
+    skipped_dist = []
     for pkg in pkgs:
         fails, notes = [], []
         check_meta(pkg, fails)
-        for tree in trees:
+        trees_pkg = resolve_trees(pkg, trees, explicit)
+        if not trees_pkg:
+            fails.append("树 %s 未装配且无任何配方元数据" % "+".join(trees))
+        for tree in trees_pkg:
             check_appinfo(pkg, tree, fails)
             check_launcher(pkg, tree, fails, notes)
             check_custom_nsh(pkg, tree, fails)
+        if not explicit and "dist" in trees and "dist" not in trees_pkg:
+            skipped_dist.append(pkg.name)
         all_fail[pkg.name] = fails
         all_note[pkg.name] = notes
 
@@ -241,6 +280,10 @@ def main():
             print("        - %s" % x)
     print("-" * 64)
     print("通过 %d / %d" % (ok, len(pkgs)))
+    if skipped_dist:
+        print("\n注：%d 个包跳过 dist 树（未装配：克隆/CI 中 dist 仅含 "
+              "update.py 与 version.json），已装配的本机重跑会自动纳入。"
+              % len(skipped_dist))
     noted = {n: v for n, v in all_note.items() if v}
     if noted:
         print("\n编码登记（非缺陷）：")
