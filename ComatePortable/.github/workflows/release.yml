@@ -20,4 +20,4 @@ jobs:
         with:
           files: |
             ComatePortable/dist/*.7z
-            ComatePortable/dist/SHA256SUMS
+            ComatePortable/dist/ComatePortable-SHA256SUMS.txt

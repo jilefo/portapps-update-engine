@@ -20,4 +20,4 @@ jobs:
         with:
           files: |
             OfficeAcePortable/dist/*.7z
-            OfficeAcePortable/dist/SHA256SUMS
+            OfficeAcePortable/dist/OfficeAcePortable-SHA256SUMS.txt

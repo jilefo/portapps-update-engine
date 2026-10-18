@@ -117,3 +117,10 @@ _shared/toolchain/
 
 # 注意：dist/<Pkg>/update.py 是**策略源码**，要入库（包级 .gitignore 已放行；
 # 根级规则管不到 dist 根目录，无需在此额外放行）
+
+# 15. 迁移工具的明细数据（逐文件 SHA-256 manifest 体积极大，可随时重算）
+_shared/migration/
+
+# 16. 产品根指针（本机路径配置，解析逻辑与默认值见 _shared/_paths.py；
+#     不提交绝对路径，新克隆仓库自动走内置默认 D:\Portapps → 回退仓库内 dist）
+_shared/portapps_root.txt

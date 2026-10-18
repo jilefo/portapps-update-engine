@@ -20,4 +20,4 @@ jobs:
         with:
           files: |
             LobsterAIPortable/dist/*.7z
-            LobsterAIPortable/dist/SHA256SUMS
+            LobsterAIPortable/dist/LobsterAIPortable-SHA256SUMS.txt

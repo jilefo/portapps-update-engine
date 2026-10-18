@@ -20,4 +20,4 @@ jobs:
         with:
           files: |
             WinClawPortable/dist/*.7z
-            WinClawPortable/dist/SHA256SUMS
+            WinClawPortable/dist/WinClawPortable-SHA256SUMS.txt

@@ -20,4 +20,4 @@ jobs:
         with:
           files: |
             WeMeetPortable/dist/*.7z
-            WeMeetPortable/dist/SHA256SUMS
+            WeMeetPortable/dist/WeMeetPortable-SHA256SUMS.txt

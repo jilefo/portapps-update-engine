@@ -20,4 +20,4 @@ jobs:
         with:
           files: |
             QoderCNPortable/dist/*.7z
-            QoderCNPortable/dist/SHA256SUMS
+            QoderCNPortable/dist/QoderCNPortable-SHA256SUMS.txt

@@ -20,4 +20,4 @@ jobs:
         with:
           files: |
             CursorPortable/dist/*.7z
-            CursorPortable/dist/SHA256SUMS
+            CursorPortable/dist/CursorPortable-SHA256SUMS.txt

@@ -20,4 +20,4 @@ jobs:
         with:
           files: |
             MiaoshouPortable/dist/*.7z
-            MiaoshouPortable/dist/SHA256SUMS
+            MiaoshouPortable/dist/MiaoshouPortable-SHA256SUMS.txt

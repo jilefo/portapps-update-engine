@@ -20,4 +20,4 @@ jobs:
         with:
           files: |
             JoplinPortable/dist/*.7z
-            JoplinPortable/dist/SHA256SUMS
+            JoplinPortable/dist/JoplinPortable-SHA256SUMS.txt

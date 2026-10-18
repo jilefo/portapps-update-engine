@@ -1,13 +1,13 @@
 # -*- coding: utf-8 -*-
-"""gen-sbom.py —— 生成 SPDX SBOM（通用版，包名自动推导）
+r"""gen-sbom.py —— 生成 SPDX SBOM（通用版，包名自动推导）
 
-只依赖标准库，输出 <打包暂存根>/sbom.spdx.json（迁移前 dist/、迁移后产品根）。
+只依赖标准库，输出 <打包暂存根>/<Pkg>-sbom.spdx.json（迁移前 <Pkg>/dist/、
+迁移后共享产品根 D:\Portapps\——按包命名避免 39 个包互相覆盖）。
 SBOM 记录本仓库便携化配置与原程序文件清单（不做依赖解析）。
 
 注：sbom 是**构建产物**、不是产品文件，故不写进产品目录内部——
 否则会撞 test_structure.py 的「产物根目录多出文件」白名单。
-迁移后所有包共用产品根下的 sbom.spdx.json（按包生成后即被消费，
-需要留档请在生成后改名 <Pkg>.sbom.spdx.json）。
+文件按 <Pkg>-sbom.spdx.json 命名，共享产品根下 39 个包互不覆盖。
 """
 import sys as _sys
 from pathlib import Path as _Path
@@ -90,7 +90,9 @@ def main():
         }],
     }
 
-    out = DIST / "sbom.spdx.json"
+    # 按包命名：迁移后 DIST 是共享产品根（D:\Portapps），
+    # 所有包共用 sbom.spdx.json 会互相覆盖。
+    out = DIST / f"{PKG}-sbom.spdx.json"
     out.write_text(json.dumps(sbom, ensure_ascii=False, indent=2),
                    encoding="utf-8")
     print("[OK] " + str(out) + " (" + str(len(files)) + " 个文件)")

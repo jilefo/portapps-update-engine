@@ -20,4 +20,4 @@ jobs:
         with:
           files: |
             ZenBrowserPortable/dist/*.7z
-            ZenBrowserPortable/dist/SHA256SUMS
+            ZenBrowserPortable/dist/ZenBrowserPortable-SHA256SUMS.txt

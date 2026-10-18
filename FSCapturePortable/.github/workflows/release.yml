@@ -20,4 +20,4 @@ jobs:
         with:
           files: |
             FSCapturePortable/dist/*.7z
-            FSCapturePortable/dist/SHA256SUMS
+            FSCapturePortable/dist/FSCapturePortable-SHA256SUMS.txt

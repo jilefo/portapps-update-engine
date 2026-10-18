@@ -20,4 +20,4 @@ jobs:
         with:
           files: |
             WorkBuddyPortable/dist/*.7z
-            WorkBuddyPortable/dist/SHA256SUMS
+            WorkBuddyPortable/dist/WorkBuddyPortable-SHA256SUMS.txt

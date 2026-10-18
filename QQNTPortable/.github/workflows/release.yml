@@ -20,4 +20,4 @@ jobs:
         with:
           files: |
             QQNTPortable/dist/*.7z
-            QQNTPortable/dist/SHA256SUMS
+            QQNTPortable/dist/QQNTPortable-SHA256SUMS.txt

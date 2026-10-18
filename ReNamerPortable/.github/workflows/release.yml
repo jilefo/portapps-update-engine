@@ -20,4 +20,4 @@ jobs:
         with:
           files: |
             ReNamerPortable/dist/*.7z
-            ReNamerPortable/dist/SHA256SUMS
+            ReNamerPortable/dist/ReNamerPortable-SHA256SUMS.txt

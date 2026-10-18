@@ -21,6 +21,9 @@ r"""fix_package_workflows.py —— 修正 111 个包级 GitHub Actions workflow
   scripts/package-paf.py       -> _shared/scripts/package-paf.py <Pkg>
   dist/  (artifact 路径)       -> <Pkg>/dist/
   dist/*.7z / dist/SHA256SUMS  -> <Pkg>/dist/...
+  dist/SHA256SUMS              -> <Pkg>/dist/<Pkg>-SHA256SUMS.txt
+  dist/sbom.spdx.json          -> <Pkg>/dist/<Pkg>-sbom.spdx.json
+（后两项是产物改名：迁移后打包产物写共享产品根，同名跨包互相覆盖）
 """
 from __future__ import annotations
 
@@ -64,10 +67,26 @@ def fix_text(t: str, pkg: str) -> tuple[str, int]:
         rep2 = rep.format(pkg=pkg)
         t, k = pat.subn(rep2, t)
         n += k
-    # release files 段：dist/*.7z、dist/SHA256SUMS、dist/*.zip、dist/sbom.spdx.json
+    # release files 段：dist/*.7z、dist/*.zip、dist/SHA256SUMS、dist/sbom.spdx.json
+    # 加包名前缀；其中 SHA256SUMS / sbom.spdx.json 同时按包改名
+    # （package-paf.py / gen-sbom.py 迁移后写到共享产品根，同名会互相覆盖）。
+    ART_RENAME = {
+        "SHA256SUMS": "{pkg}-SHA256SUMS.txt",
+        "sbom.spdx.json": "{pkg}-sbom.spdx.json",
+    }
+
+    def _rename(m):
+        name = m.group(2)
+        new = ART_RENAME.get(name)
+        if new:
+            name = new.format(pkg=pkg)
+        return f"{m.group(1)}{pkg}/dist/{name}"
+
+    # 兼容两种现状：裸 dist/...（未加过前缀）与 <Pkg>/dist/...（已加过），
+    # 统一收敛为 <Pkg>/dist/<Pkg>-<name>。
     t2, k = re.subn(
-        r"(?m)^(\s*)(dist/(?:\*\.7z|\*\.zip|SHA256SUMS|sbom\.spdx\.json))\s*$",
-        lambda m: f"{m.group(1)}{pkg}/{m.group(2)}", t)
+        r"(?m)^(\s*)(?:[A-Za-z0-9_.\-]+/)?dist/(\*\.7z|\*\.zip|SHA256SUMS|sbom\.spdx\.json)\s*$",
+        _rename, t)
     n += k
     return t2, n
 

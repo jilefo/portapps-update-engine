@@ -2,6 +2,44 @@
 
 本项目采用「配方开源（MIT）+ 二进制不随仓库分发」的模式。版本号遵循语义化版本。
 
+## [1.7.0] — 2026-10-19
+
+### 新增
+- `_shared/tools/migrate_dist.py` —— dist → 产品根逐包原子迁移工具：同卷 `os.rename`
+  （零拷贝、零额外空间、原子），四道安全栅（进程占用检查 / 预迁移逐文件 SHA-256
+  manifest / 包内绝对目标 junction 重定点 / 迁移后全等比对），
+  另附 `dist` 根额外产物搬运与空目录清理
+- `_shared/_paths.py` —— 产品根路径唯一解析处（`PORTAPPS_ROOT` >
+  `_shared/portapps_root.txt` > 内置默认 `D:\Portapps` > 回退仓库内旧 `dist/`），
+  63 处 dist 硬编码全部收敛，迁移前后工具链零配置自动切换
+
+### 变更
+- **可运行产物迁出仓库**：59.12 GB / 598,293 个文件从 `<Repo>/<Pkg>/dist/<Pkg>/`
+  整体迁到 `<产品根>/<Pkg>/`（默认 `D:\Portapps`），迁移前后逐文件 SHA-256 全等；
+  `update.py` 改由生成器按需产出（生成器即配方），仓库只留
+  `_shared/configs/<Pkg>.yaml` + `gen_update_strategies.py`
+- 共享产物改为包唯一命名：`<Pkg>-SHA256SUMS.txt` / `<Pkg>-sbom.spdx.json`
+  （迁移后 39 包共用一个产物根，旧命名会跨包覆盖）
+- 清理 228 个旧版更新引擎遗留的包内 `_shared/update/` 空骨架目录
+- `.gitignore` 新增 `_shared/migration/` 与 `_shared/portapps_root.txt`
+  （迁移明细可再生成、产品根指针属本机配置）
+
+### 文档
+- `docs/01`~`docs/07` 七份现行文档按三树结构（源树 / 产品树 / 工具链）全面更新；
+  `04-避坑手册` §2.1、§8.5 补迁移后的探测式仓库根定位说明
+- 更新策略 `update.py` 脱离仓库后：靠 `PORTABLEAPPS_REPO` 环境变量或向上探测
+  定位仓库，找不到退临时目录，脚本永远能跑
+
+### 已知限制（不阻塞发布）
+- WorkBuddyPortable 因宿主进程占用源树延后迁移，需关闭 WorkBuddy 后执行
+  `migrate_dist.py run --pkg WorkBuddyPortable --yes`（届时自动重定点 2 个包内 junction）
+- CI 自动发布的是**配方包**（git archive + SHA256SUMS + Release Notes），
+  不是产品根里的 59 GB 便携产物——后者在仓库外，CI 拿不到也无法构建。
+  二进制分发见 `docs/06-开源与发布.md`，接入方法见 `docs/07` §7
+- Gitee Go 的「执行 shell」插件 id 随实例版本变化，首次配置需在流水线编辑器里
+  核对一次（`.workflow/release.yml` 内有说明）
+- `version.json` 仅 1/39 个包存在，门禁如实报覆盖度，待补齐
+
 ## [1.6.0] — 2026-10-18
 
 ### 新增

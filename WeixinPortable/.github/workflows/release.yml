@@ -20,4 +20,4 @@ jobs:
         with:
           files: |
             WeixinPortable/dist/*.7z
-            WeixinPortable/dist/SHA256SUMS
+            WeixinPortable/dist/WeixinPortable-SHA256SUMS.txt

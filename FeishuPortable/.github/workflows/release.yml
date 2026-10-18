@@ -20,4 +20,4 @@ jobs:
         with:
           files: |
             FeishuPortable/dist/*.7z
-            FeishuPortable/dist/SHA256SUMS
+            FeishuPortable/dist/FeishuPortable-SHA256SUMS.txt

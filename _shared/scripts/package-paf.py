@@ -36,12 +36,18 @@ def main() -> int:
     if "--checksum-only" not in sys.argv:
         out = shutil.make_archive(str(archive), "zip", root_dir=DIST, base_dir=PKG)
         print(f"[OK] {out}")
+    # 只校验本包的 zip：迁移后 DIST 是共享产品根（D:\Portapps），
+    # glob("*.zip") 会把 39 个包的 zip 全算进本包 SHA256SUMS。
+    # 校验和文件同样按包命名，避免跨包互相覆盖。
+    mine = DIST / f"{PKG}.zip"
     sums = []
-    for f in sorted(DIST.glob("*.zip")):
-        sums.append(f"{sha256_file(f)}  {f.name}")
-    if sums:
-        (DIST / "SHA256SUMS").write_text("\n".join(sums) + "\n", encoding="utf-8")
-        print("[OK] " + str(DIST / "SHA256SUMS"))
+    if mine.is_file():
+        sums.append(f"{sha256_file(mine)}  {mine.name}")
+        out_sums = DIST / f"{PKG}-SHA256SUMS.txt"
+        out_sums.write_text("\n".join(sums) + "\n", encoding="utf-8")
+        print("[OK] " + str(out_sums))
+    else:
+        print(f"[WARN] 未找到本包 zip：{mine}（先构建或用 --checksum-only 前确认）")
     return 0
 
 

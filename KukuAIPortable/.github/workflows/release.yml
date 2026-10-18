@@ -26,5 +26,5 @@ jobs:
         with:
           files: |
             KukuAIPortable/dist/*.zip
-            KukuAIPortable/dist/SHA256SUMS
-            KukuAIPortable/dist/sbom.spdx.json
+            KukuAIPortable/dist/KukuAIPortable-SHA256SUMS.txt
+            KukuAIPortable/dist/KukuAIPortable-sbom.spdx.json

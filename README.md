@@ -58,8 +58,8 @@ python _shared/tools/smoke_3rounds.py
 python _shared/scripts/build-portable.py CursorPortable
 python _shared/scripts/test_structure.py CursorPortable
 
-# 7. 更新检测：每包自带 dist/<Pkg>/update.py（自包含，可随包拷走）
-cd CursorPortable/dist/CursorPortable
+# 7. 更新检测：每包自带 <产品根>/<Pkg>/update.py（自包含，可随包拷走）
+cd D:\Portapps\CursorPortable
 python update.py --check                  # 只检测，只读
 python update.py --update --execute       # 真更新（自动备份+回滚）
 python update.py --ingest <包> --execute  # 人工下载后接管全流程
@@ -78,7 +78,7 @@ python _shared/update/runner.py --check --all --report
 |---|---|
 | [`docs/README.md`](docs/README.md) | 文档总索引 |
 | [`docs/01-快速开始.md`](docs/01-快速开始.md) | 从零构建第一个便携包 |
-| [`docs/02-架构与目录规范.md`](docs/02-架构与目录规范.md) | 双树结构、PAL 机制、配置字段含义 |
+| [`docs/02-架构与目录规范.md`](docs/02-架构与目录规范.md) | 三树结构、PAL 机制、配置字段含义 |
 | [`docs/03-构建与发布.md`](docs/03-构建与发布.md) | 构建流程、版本号、发布与开源合规 |
 | [`docs/04-避坑手册.md`](docs/04-避坑手册.md) | **踩坑清单（务必先读）** |
 | [`docs/05-验收与排查.md`](docs/05-验收与排查.md) | 冒烟/审计工具用法与判定标准 |
@@ -99,13 +99,18 @@ python _shared/update/runner.py --check --all --report
 | 数据落地重定向（APPDATA / LOCALAPPDATA） | 39/39 全部指向 `%PAL:DataDir%` |
 | CI 结构自检（元数据 + appinfo + Launcher + Custom.nsh + 编码铁律，双树） | **39/39 通过** |
 | Custom.nsh 病态扫描 | 38 个包全部「无病态」；另修掉 2 包 4 个文件的 UTF-8 BOM |
-| 生产级静态审计 | 已修复 3 个 ExtractIcon 路径错误、23 个包 dist appinfo 缺段 |
+| 生产级静态审计 | 已修复 3 个 ExtractIcon 路径错误、23 个包产品树 appinfo 缺段 |
 | 开源完备性（LICENSE/README/.github/docs） | 包级 39/39 齐备；根级脚手架本轮补齐（CHANGELOG / CoC / .editorconfig / SECURITY / CI） |
-| 更新策略脚本 | **39/39**，每包一个 `dist/<Pkg>/update.py`；在线自动源 7 个，其余诚实标记人工 + `--ingest` 接管；全量检测 0 异常 |
+| 更新策略脚本 | **39/39**，每包一个 `<产品根>/<Pkg>/update.py`（由 `_shared/configs/<Pkg>.yaml` + 生成器产出）；在线自动源 7 个，其余诚实标记人工 + `--ingest` 接管；全量检测 0 异常 |
 | 更新端到端实测 | SublimeText 4200 → 4215 真实更新成功（剔除上游 Data、禁用自带更新器、结构校验 PASS、真启动冒烟 PASS）；回滚链路实测通过 |
+| dist → 产品根迁移（2026-10-19） | **38/39 包完成**：559,349 文件 / 61.28 GB，同卷原子 rename，迁移前后逐文件 SHA-256 全等；junction 数前后一致，1 个包内 junction 自动重定点 |
 
 ### 已知遗留（非阻断）
 
+- `WorkBuddyPortable` 延后迁移：宿主进程占用源树（10 个进程），
+  需关闭 WorkBuddy 后执行
+  `python _shared/tools/migrate_dist.py run --pkg WorkBuddyPortable --yes`；
+  迁移前工具链按旧布局回退，功能不受影响。
 - 11 个 Electron 类包重定向 `USERPROFILE`：实测可正常启动与写入，
   但存在崩溃风险，审计列为「已知风险」而非阻断项。
 - `MiaoshouPortable.ini` 必须保持 UTF-16LE（含中文路径），**禁止转 UTF-8**。

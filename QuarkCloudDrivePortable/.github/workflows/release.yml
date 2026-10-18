@@ -20,4 +20,4 @@ jobs:
         with:
           files: |
             QuarkCloudDrivePortable/dist/*.7z
-            QuarkCloudDrivePortable/dist/SHA256SUMS
+            QuarkCloudDrivePortable/dist/QuarkCloudDrivePortable-SHA256SUMS.txt

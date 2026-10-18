@@ -20,4 +20,4 @@ jobs:
         with:
           files: |
             TraeCNPortable/dist/*.7z
-            TraeCNPortable/dist/SHA256SUMS
+            TraeCNPortable/dist/TraeCNPortable-SHA256SUMS.txt

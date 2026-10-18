@@ -20,4 +20,4 @@ jobs:
         with:
           files: |
             SoloMDPortable/dist/*.7z
-            SoloMDPortable/dist/SHA256SUMS
+            SoloMDPortable/dist/SoloMDPortable-SHA256SUMS.txt

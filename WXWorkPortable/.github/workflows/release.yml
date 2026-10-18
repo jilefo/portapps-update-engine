@@ -20,4 +20,4 @@ jobs:
         with:
           files: |
             WXWorkPortable/dist/*.7z
-            WXWorkPortable/dist/SHA256SUMS
+            WXWorkPortable/dist/WXWorkPortable-SHA256SUMS.txt

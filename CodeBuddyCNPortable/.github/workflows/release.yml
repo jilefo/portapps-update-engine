@@ -20,4 +20,4 @@ jobs:
         with:
           files: |
             CodeBuddyCNPortable/dist/*.7z
-            CodeBuddyCNPortable/dist/SHA256SUMS
+            CodeBuddyCNPortable/dist/CodeBuddyCNPortable-SHA256SUMS.txt

@@ -20,4 +20,4 @@ jobs:
         with:
           files: |
             eDiaryPortable/dist/*.7z
-            eDiaryPortable/dist/SHA256SUMS
+            eDiaryPortable/dist/eDiaryPortable-SHA256SUMS.txt

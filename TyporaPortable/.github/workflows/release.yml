@@ -20,4 +20,4 @@ jobs:
         with:
           files: |
             TyporaPortable/dist/*.7z
-            TyporaPortable/dist/SHA256SUMS
+            TyporaPortable/dist/TyporaPortable-SHA256SUMS.txt

@@ -20,4 +20,4 @@ jobs:
         with:
           files: |
             ZoomPortable/dist/*.7z
-            ZoomPortable/dist/SHA256SUMS
+            ZoomPortable/dist/ZoomPortable-SHA256SUMS.txt

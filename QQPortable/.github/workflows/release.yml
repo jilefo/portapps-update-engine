@@ -20,4 +20,4 @@ jobs:
         with:
           files: |
             QQPortable/dist/*.7z
-            QQPortable/dist/SHA256SUMS
+            QQPortable/dist/QQPortable-SHA256SUMS.txt

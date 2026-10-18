@@ -20,4 +20,4 @@ jobs:
         with:
           files: |
             TodayCNPortable/dist/*.7z
-            TodayCNPortable/dist/SHA256SUMS
+            TodayCNPortable/dist/TodayCNPortable-SHA256SUMS.txt

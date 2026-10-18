@@ -20,4 +20,4 @@ jobs:
         with:
           files: |
             JoyCodePortable/dist/*.7z
-            JoyCodePortable/dist/SHA256SUMS
+            JoyCodePortable/dist/JoyCodePortable-SHA256SUMS.txt

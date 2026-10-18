@@ -20,4 +20,4 @@ jobs:
         with:
           files: |
             BaiduNetdiskPortable/dist/*.7z
-            BaiduNetdiskPortable/dist/SHA256SUMS
+            BaiduNetdiskPortable/dist/BaiduNetdiskPortable-SHA256SUMS.txt

@@ -104,12 +104,16 @@ def packages():
 
 
 def tree_populated(pkg, tree):
-    """该树是否已装配（有 AppInfo/Launcher 等真实构建产物）。
+    r"""该树是否已装配（有 AppInfo/Launcher 等真实构建产物）。
 
     clone / CI 环境里 <Pkg>/dist/ 下只有 update.py 与 version.json
     （程序二进制被 .gitignore 排除），强行审计 dist 树会全员误报
     「缺 appinfo.ini」——这正是开源后 CI 假红的根因。
     dist 迁到 D:\Portapps 后由 tree_root() 改读产品根，本函数随之生效。
+
+    注意用 raw docstring：正文里的 `D:\Portapps` 若在非 raw 字符串里，
+    `\P` 是非法转义序列（Python 3.12+ 报 SyntaxWarning，加 -W error 直接
+    变 SyntaxError，整条 CI 门禁跑不起来）。
     """
     base = tree_root(pkg, tree)
     return ((base / "App" / "AppInfo" / "Launcher").is_dir()

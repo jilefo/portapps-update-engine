@@ -20,4 +20,4 @@ jobs:
         with:
           files: |
             TIMPortable/dist/*.7z
-            TIMPortable/dist/SHA256SUMS
+            TIMPortable/dist/TIMPortable-SHA256SUMS.txt

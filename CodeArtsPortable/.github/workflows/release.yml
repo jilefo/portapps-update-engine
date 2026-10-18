@@ -20,4 +20,4 @@ jobs:
         with:
           files: |
             CodeArtsPortable/dist/*.7z
-            CodeArtsPortable/dist/SHA256SUMS
+            CodeArtsPortable/dist/CodeArtsPortable-SHA256SUMS.txt

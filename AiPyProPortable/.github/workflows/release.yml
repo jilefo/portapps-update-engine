@@ -20,4 +20,4 @@ jobs:
         with:
           files: |
             AiPyProPortable/dist/*.7z
-            AiPyProPortable/dist/SHA256SUMS
+            AiPyProPortable/dist/AiPyProPortable-SHA256SUMS.txt

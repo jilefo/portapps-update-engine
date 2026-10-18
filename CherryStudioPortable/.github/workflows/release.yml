@@ -26,5 +26,5 @@ jobs:
         with:
           files: |
             CherryStudioPortable/dist/*.zip
-            CherryStudioPortable/dist/SHA256SUMS
-            CherryStudioPortable/dist/sbom.spdx.json
+            CherryStudioPortable/dist/CherryStudioPortable-SHA256SUMS.txt
+            CherryStudioPortable/dist/CherryStudioPortable-sbom.spdx.json

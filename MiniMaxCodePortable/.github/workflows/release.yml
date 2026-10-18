@@ -20,4 +20,4 @@ jobs:
         with:
           files: |
             MiniMaxCodePortable/dist/*.7z
-            MiniMaxCodePortable/dist/SHA256SUMS
+            MiniMaxCodePortable/dist/MiniMaxCodePortable-SHA256SUMS.txt

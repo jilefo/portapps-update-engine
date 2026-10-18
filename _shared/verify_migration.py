@@ -1,8 +1,11 @@
 # -*- coding: utf-8 -*-
-"""verify_migration.py —— 迁移完整性核验
+r"""verify_migration.py —— 迁移完整性核验
 
 对比 Work\ 残留 与 PortableApps\ 目标，逐文件校验大小；
-对app.asar 等大文件额外做 SHA256 比对，确保复制无损。
+对 app.asar 等大文件额外做 SHA256 比对，确保复制无损。
+
+注：raw docstring——原写法 `Work\ ` 尾部反斜杠是非法转义
+（Python 3.12+ SyntaxWarning，`-W error::SyntaxWarning` 下变 SyntaxError）。
 """
 import hashlib
 import os
