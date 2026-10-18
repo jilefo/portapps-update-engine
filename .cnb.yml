@@ -1,0 +1,44 @@
+# CNB.COOL（腾讯云云原生构建）—— 推送版本 Tag 后自动发布
+# 本文件放在仓库根目录，CNB 推送后自动识别。
+
+$:
+  tag_push:
+    - docker:
+        image: docker.cnb.cool/examples/language/python-3:latest
+      stages:
+        - name: 门禁与打包
+          script: |
+            set -e
+            python _shared/tools/release.py prepare --out build/release
+            echo "---- 产物 ----"
+            ls -l build/release
+
+        # git:release 是 CNB 内置任务（type 而非 image），按 tag_push 的 Tag
+        # 创建/更新 Release；tag_push 事件下无需传 tag。
+        # ★ 它不支持上传附件，附件由下一个阶段的 cnbcool/attachments 插件负责。
+        - name: 创建 Release
+          type: git:release
+          options:
+            title: PortableApps 配方
+            descriptionFromFile: build/release/RELEASE-NOTES.md
+            latest: true
+            preRelease: false
+            overlying: true          # true=仅更新，false=先删后建；避免误删历史
+
+        - name: 上传 Release 附件
+          image: cnbcool/attachments:latest
+          settings:
+            attachments:
+              - "build/release/PortableApps-formula-*.zip"
+              - "build/release/RELEASE-NOTES.md"
+              - "build/release/SHA256SUMS"
+              - "build/release/release_manifest.json"
+          exports:
+            FILES: FILES
+
+# ---------------------------------------------------------------------
+# 说明：本仓库是「配方开源 + 二进制不随仓库分发」模式，59 GB 的 dist/ 便携
+# 产物不在仓库里，CI 在新克隆上拿不到也无法构建。因此这里发布的是**配方包**
+# （git archive + 校验值 + Release Notes），便携程序本体的分发见
+# docs/06-开源与发布.md。若要在此自动分发二进制，需先把产物放到 CNB 可拉取的
+# 位置（Generic 通用制品库或外网 URL），再在本文件里加一步下载。

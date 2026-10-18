@@ -23,16 +23,28 @@ def main() -> int:
         else Path(__file__).resolve().parents[2]
 
     # 扫描器自身的 pattern 文本会自我命中 → 自排除
-    SELF = {Path(__file__).name, "sanitize_paths.py"}
+    # （audit_pre_release.py / quarantine_junk.py / release.py 里都有
+    #  `SECRET = re.compile(...)`、`LEAK = re.compile(...)` 这类字面量，
+    #   会被 SECRET_CFG / LEAK 自己命中；不排就是假阳性）
+    SELF = {Path(__file__).name, "sanitize_paths.py",
+            "audit_pre_release.py", "quarantine_junk.py", "release.py"}
 
     # ── 1. 取真实入库清单 ──────────────────────────────────────
+    # ★ 早先只取 `git add -A --dry-run` 的**未跟踪**文件，于是改动一个
+    #   已跟踪文件、往里塞本机路径，门禁看不见——覆盖面虚报。
+    #   现在取「已跟踪」与「将要新增」的并集，两者分别计数上报。
     out = subprocess.run(["git", "add", "-A", "--dry-run"], cwd=ROOT,
                          capture_output=True, text=True, encoding="utf-8")
-    paths = []
+    added = []
     for line in out.stdout.splitlines():
         line = line.strip()
         if line.startswith("add '"):
-            paths.append(line[5:].rstrip("'"))
+            added.append(line[5:].rstrip("'"))
+    tracked = subprocess.run(["git", "ls-files"], cwd=ROOT,
+                             capture_output=True, text=True,
+                             encoding="utf-8").stdout.splitlines()
+    tracked = [t for t in tracked if t.strip()]
+    paths = list(dict.fromkeys(added + tracked))     # 保序去重
 
     # ── 2. 体积 ─────────────────────────────────────────────────
     total = 0
@@ -50,7 +62,8 @@ def main() -> int:
     print("=" * 74)
     print("开源前自检 —— git 实际会追踪的内容")
     print("=" * 74)
-    print(f"文件数        : {len(paths)}")
+    print(f"文件数        : {len(paths)}"
+          f"（已跟踪 {len(tracked)} + 待新增 {len(added)}）")
     print(f"总体积        : {total / 1024 / 1024:.2f} MB")
     print(f"最大单文件    : {max((s for s, _ in big), default=0) / 1024 / 1024:.2f} MB"
           f"（>1MB 的文件共 {len(big)} 个）")

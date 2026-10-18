@@ -2,6 +2,38 @@
 
 本项目采用「配方开源（MIT）+ 二进制不随仓库分发」的模式。版本号遵循语义化版本。
 
+## [1.6.0] — 2026-10-18
+
+### 新增
+- `docs/07-四平台自动发布.md` + 四份流水线配置（`.github/workflows/release.yml`、
+  `.workflow/release.yml`、`.gitcode/workflows/release.yml`、`.cnb.yml`）——
+  GitHub / Gitee / GitCode / CNB.COOL 四平台推送版本 Tag 即自动发版，
+  统一入口为 `_shared/tools/release.py`（`prepare` 门禁打包 / `upload` 上传）
+- `docs/reports/开源前审计与清理报告-20261018.md` —— 开源文件审计、逐包启动/存储/更新
+  静态检查、清理清单与回滚命令的合并交付报告
+
+### 修复
+- **★ `_pkg.py` 推导不出真实包名时假红**：`pkg_name()` 的回退分支直接取当前目录名，
+  于是在仓库根跑 `test_structure.py` 会推出 `PKG=<仓库目录名>`，报一串
+  「缺 appinfo.ini」的假错。改为校验包目录存在性，不存在则退出并列出全部可用包名
+- **★ `audit_before_push.py` 覆盖面虚报**：只扫 `git add -A --dry-run` 的**未跟踪**
+  文件，改动已跟踪文件往里塞本机路径门禁看不见。改为「已跟踪 ∪ 待新增」并集，
+  分别计数上报（实测 1710 + 9 = 1719）
+- **★ `audit_before_push.py` 假阳性**：`SECRET_CFG` 会命中扫描器自身的
+  `SECRET = re.compile(...)` 字面量。把 `audit_pre_release.py` /
+  `quarantine_junk.py` / `release.py` 加入自排除集
+- `release.py` 版本一致性检查不再瞒报覆盖度：`version.json` 由更新引擎运行期写入，
+  实际只有 1/39 个包存在；旧实现 glob 到几个就报「0 不一致」。现按包全集逐包核对并
+  明确输出 `覆盖度: N/39`
+
+### 已知限制（不阻塞发布）
+- CI 自动发布的是**配方包**（git archive + SHA256SUMS + Release Notes），
+  不是 59 GB 的 dist/ 便携产物——后者不入库，CI 在新克隆上拿不到也无法构建。
+  二进制分发见 `docs/06-开源与发布.md`，接入方法见 `docs/07` §7
+- Gitee Go 的「执行 shell」插件 id 随实例版本变化，首次配置需在流水线编辑器里
+  核对一次（`.workflow/release.yml` 内有说明）
+- `version.json` 仅 1/39 个包存在，门禁如实报覆盖度，待补齐
+
 ## [1.5.0] — 2026-10-18
 
 ### 新增

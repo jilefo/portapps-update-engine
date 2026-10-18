@@ -1,0 +1,51 @@
+name: release
+
+# 触发：只认版本 tag 与手动触发，不在每次提交时发布
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+      - 'v[0-9]+.[0-9]+.[0-9]+-*'
+  workflow_dispatch:
+    inputs:
+      prerelease:
+        description: '标记为预发布'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write        # 创建 Release 需要
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0            # git archive 需要完整对象
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: 门禁 + 打包（audit_repo / check_custom_nsh / test_structure×39 / audit_before_push）
+        run: python _shared/tools/release.py prepare --out build/release
+
+      - name: 留档（无论发布是否成功，产物可下载）
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ github.ref_name }}
+          path: build/release/*
+          if-no-files-found: error
+
+      - name: 创建 Release 并上传附件
+        env:
+          RELEASE_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          TAG="$(cat build/release/TAG)"
+          EXTRA=""
+          if [ "${{ inputs.prerelease }}" = "true" ]; then EXTRA="--prerelease"; fi
+          python _shared/tools/release.py upload \
+            --dir build/release --platform github \
+            --repo "$GITHUB_REPOSITORY" --tag "$TAG" $EXTRA

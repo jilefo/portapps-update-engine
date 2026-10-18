@@ -1,0 +1,41 @@
+# GitCode Pipeline —— 推送版本 Tag 后自动发布
+# 文件必须放在仓库根目录的 .gitcode/workflows/ 目录下
+# （注意：不是 .github/workflows/，目录错了流水线不会被识别）
+
+name: release
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+      - 'v[0-9]+.[0-9]+.[0-9]+-*'
+
+jobs:
+  release:
+    # GitCode 默认提供 euleros / ubuntu 两类 runner
+    runs-on: ubuntu-latest
+    steps:
+      - name: 拉取代码
+        uses: checkout-action@0.0.1
+        with:
+          fetch-depth: 0            # git archive 需要完整对象
+
+      - name: 配置 Python
+        uses: setup-python@0.0.1
+        with:
+          python-version: '3.12'
+
+      - name: 门禁 + 打包
+        run: |
+          python _shared/tools/release.py prepare --out build/release
+          cat build/release/TAG
+
+      - name: 创建发行版并上传附件
+        env:
+          RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+          GITCODE_REPO: ${{ github.repository }}
+        run: |
+          TAG="$(cat build/release/TAG)"
+          python _shared/tools/release.py upload \
+            --dir build/release --platform gitcode \
+            --repo "$GITCODE_REPO" --tag "$TAG"

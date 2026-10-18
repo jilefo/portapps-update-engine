@@ -1,0 +1,74 @@
+# Gitee Go 流水线 —— 推送版本 Tag 后自动发布
+# 配置文件必须放在仓库根目录的 .workflow/ 下，且需在 Gitee 网页端
+# 「流水线」里启用本流水线（Gitee Go 不会自动激活仓库内的 yml）。
+
+version: '1.0'
+name: release
+displayName: 自动发布（tag 推送）
+
+triggers:
+  push:
+    tags:
+      prefix:
+        - v            # 命中 v1.5.0 / v1.5.0-rc1 等；空数组表示匹配所有 Tag
+
+variables:
+  OUT_DIR: build/release
+
+stages:
+  - stage: verify
+    displayName: 门禁与打包
+    strategy: naturally
+    trigger: auto
+    executor: []
+    steps:
+      # ★ 唯一需要按你的 Gitee 实例确认的一处：
+      #   Gitee Go 的「执行 shell」插件 id 随实例版本变化，社区常见写法是
+      #   build@shell。若保存时报未知插件，进「流水线 → 新建任务 → 执行 shell
+      #   脚本 → 切到 YAML 视图」，把真实的 step id 抄回来替换即可，其余不用动。
+      - step: build@shell
+        name: prepare
+        displayName: 跑门禁并打包
+        commands:
+          - python _shared/tools/release.py prepare --out ${OUT_DIR}
+          - cat ${OUT_DIR}/TAG
+
+  - stage: publish
+    displayName: 发布到 Gitee 发行版
+    strategy: naturally
+    trigger: auto
+    executor: []
+    steps:
+      - step: build@shell
+        name: upload
+        displayName: 创建 Release 并上传附件
+        # RELEASE_TOKEN 在「流水线 → 参数配置 → 凭证」里注入为环境变量，
+        # 值是 Gitee 访问令牌（user:open_api 或仓库 write 权限）。
+        # 切勿把令牌写进本文件。
+        env:
+          RELEASE_TOKEN: ${RELEASE_TOKEN}
+          GITEE_REPO: ${GITEE_REPO}
+        commands:
+          - |
+            TAG=$(cat ${OUT_DIR}/TAG)
+            python _shared/tools/release.py upload \
+              --dir ${OUT_DIR} --platform gitee \
+              --repo "$GITEE_REPO" --tag "$TAG"
+
+# 备选方案（不消耗令牌，但附件名必须写死）：
+#   把 publish 阶段换成官方 release@gitee 插件 ——
+#     - step: release@gitee
+#       name: release_gitee
+#       displayName: Gitee Release
+#       releaseName: <版本号>
+#       description: build/release/RELEASE-NOTES.md
+#       tagName: <版本号>
+#       assertFiles:
+#         - build/release/PortableApps-formula-<版本号>.zip
+#         - build/release/RELEASE-NOTES.md
+#         - build/release/SHA256SUMS
+#         - build/release/release_manifest.json
+#       prerelease: false
+#       allowUpdate: true
+#   注意 assertFiles 的路径必须与 prepare 产出的文件名一致（含版本号），
+#   且需先在上一步把 build/release 声明为 artifacts 供插件取用。

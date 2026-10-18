@@ -23,8 +23,36 @@ def pkg_name():
     return _os.environ.get("PAF_PKG") or cwd.name
 
 
+def list_packages():
+    """仓库根下真正的包：含 portableapps/ 或 dist/ 子目录的一级目录。
+
+    用来在包名解析失败时给出可用清单，而不是把用户引向一个
+    根本不存在的目录（旧行为：从仓库根跑脚本会推出 PKG=<仓库目录名>，
+    然后报一串"缺 appinfo.ini"的假错）。
+    """
+    out = []
+    for d in sorted(REPO_ROOT.iterdir()):
+        if not d.is_dir() or d.name.startswith("."):
+            continue
+        if (d / "portableapps").is_dir() or (d / "dist").is_dir():
+            out.append(d.name)
+    return out
+
+
 PKG = pkg_name()
 REPO = REPO_ROOT / PKG
+
+if not REPO.is_dir():
+    _sys.stderr.write(
+        "[FAIL] 包目录不存在: %s\n"
+        "       推导来源可能是当前目录名/PAF_PKG，本脚本是【单包】脚本，\n"
+        "       需在包目录内执行，或显式传包名，例如：\n"
+        "           python %s %s\n"
+        "       可用包（%d 个）：%s\n"
+        % (REPO, _Path(_sys.argv[0]).name,
+           (list_packages() or ["<Pkg>"])[0],
+           len(list_packages()), ", ".join(list_packages())))
+    _sys.exit(2)
 
 if __name__ == "__main__":
     print("PKG =", PKG)
