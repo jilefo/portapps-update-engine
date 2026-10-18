@@ -100,6 +100,11 @@ _shared/tools/_projects_index.json
 #     ↑ 注意：勿在此行后追加行尾注释，Git 不支持行内注释，
 #       整行会被当成 pattern 导致规则静默失效（曾漏 39 条本机绝对路径）。
 
+# 13b. 私人任务书 / 提示词（含本机绝对路径与内部任务框架，不属于开源交付物）
+#      已从 git 移除并备份到仓库外；此规则防止再被 git add -A 误收录
+*提示词*.md
+*任务书*.md
+
 # 14. ★ PortableApps.com Launcher + NSIS 工具链（第三方，vendored 副本）
 #     体积约 11MB / 900+ 文件，且 PAL 为 GPL 授权、NSIS 为 zlib 授权，
 #     与本期 MIT「配方」混在一个仓库里授权关系不清 → 不入库。
