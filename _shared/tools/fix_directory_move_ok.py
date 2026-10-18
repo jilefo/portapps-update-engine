@@ -1,22 +1,28 @@
 # -*- coding: utf-8 -*-
+import io
+import os
+import sys
+from pathlib import Path
+
 # >>> 路径自适应（开源迁移注入，勿删）：仓库根由本文件位置推导，
 #     不再写死绝对路径，可用 PORTABLEAPPS_ROOT 环境变量覆盖。
 import os as _os
 from pathlib import Path as _Path
 REPO_ROOT = (_os.environ.get("PORTABLEAPPS_ROOT")
              or str(_Path(__file__).resolve().parents[2]))
-REPO_ROOT_F = REPO_ROOT.replace("\\", "/")
-_TOOLS_DIR_F = str(_Path(__file__).resolve().parent).replace("\\", "/")
 # <<< 路径自适应
+
+# 产品根唯一解析处（dist 迁移到 D:\Portapps 后由它接管产品路径）。
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import _paths                                     # noqa: E402
+
 r"""给缺失 DirectoryMoveOK 的包补上 [Launch] DirectoryMoveOK=yes
 背景：包从 Work\ 迁移到 PortableApps\ 后，PAL 的 DirectoryMoving 段检测到
 路径变更；launcher.ini 未设置 DirectoryMoveOK 时走 MB_YESNO 警告弹窗
 （launcher 挂在对话框上永不启动，tasklist 主窗口标题看不出异常）。
-dist 与 portableapps 源码树两处都补，保持编码与 BOM 状态不变。
+产品树（迁移前 dist/、迁移后产品根）与 portableapps 源码树两处都补，
+保持编码与 BOM 状态不变。
 """
-import io
-import os
-
 ROOT = REPO_ROOT
 TARGETS = ['AiPyProPortable', 'ComatePortable', 'JoyCodePortable', 'MiaoshouPortable',
            'MiniMaxCodePortable', 'OfficeAcePortable', 'TodayCNPortable', 'CodeArtsAgentPortable']
@@ -59,12 +65,12 @@ def patch(path):
 
 
 for proj in TARGETS:
-    for rel in (('dist', proj, proj + '.ini'),):
-        p = os.path.join(ROOT, proj, rel[0], rel[1], 'App', 'AppInfo', 'Launcher', rel[2])
-        if os.path.isfile(p):
-            print(proj, '|dist|', patch(p))
-        else:
-            print(proj, '|dist| ini 不存在:', p)
+    # 产品树：迁移前 <Repo>/<Pkg>/dist/<Pkg>，迁移后 <产品根>/<Pkg>
+    p = _paths.product_dir(proj) / 'App' / 'AppInfo' / 'Launcher' / (proj + '.ini')
+    if p.is_file():
+        print(proj, '|产品|', patch(p))
+    else:
+        print(proj, '|产品| ini 不存在:', p)
     p2 = os.path.join(ROOT, proj, 'portableapps', 'App', 'AppInfo', 'Launcher', proj + '.ini')
     if os.path.isfile(p2):
         print(proj, '|src |', patch(p2))

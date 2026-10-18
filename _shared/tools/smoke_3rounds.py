@@ -36,7 +36,9 @@ import time
 from datetime import datetime
 
 sys.path.insert(0, _TOOLS_DIR_F)
+sys.path.insert(0, _Path(__file__).resolve().parents[1])
 import smoke_clean as sc
+import _paths                                     # noqa: E402
 
 ROUNDS = 3
 QQ_FAMILY = {"QQPortable", "TIMPortable", "QQNTPortable"}
@@ -111,15 +113,17 @@ def qq_cold_clean():
 
 def build_units():
     projs = sc.load_projects()
+    # WPS 主入口：产品目录由 _paths 解析（迁移后产品根、迁移前仓库 dist）
     wps_main = dict(
         name="WPSOfficePortable-Main",
-        exe=os.path.join(sc.ROOT, "WPSOfficePortable", "dist",
-                         "WPSOfficePortable", "WPSOfficePortable.exe"),
+        exe=os.path.join(str(_paths.product_dir("WPSOfficePortable")),
+                         "WPSOfficePortable.exe"),
         cmd="wpsoffice.exe")
     if os.path.isfile(wps_main["exe"]):
         projs.append(wps_main)
     else:
-        print("!! WPSOfficePortable 主 exe 缺失", flush=True)
+        print("!! WPSOfficePortable 主 exe 缺失: %s（产品根=%s）"
+              % (wps_main["exe"], _paths.product_root()), flush=True)
     return projs
 
 

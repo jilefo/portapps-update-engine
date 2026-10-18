@@ -40,6 +40,8 @@ from packaging.version import InvalidVersion, Version
 # ---------------------------------------------------------------- 路径与常量
 
 ROOT = Path(__file__).resolve().parent          # ...\PortableApps\_shared
+sys.path.insert(0, str(ROOT))                   # 定位 _paths（路径唯一解析处）
+import _paths                                   # noqa: E402
 WORK = ROOT.parent                              # ...\PortableApps（各项目父目录）
 CONFIGS = ROOT / "configs"
 STATE_FILE = ROOT / "state" / "update_versions.json"
@@ -150,7 +152,16 @@ def result(exit_code: int, msg: str, **kw) -> dict:
 
 
 def pkg_dir(cfg: dict) -> Path:
-    return WORK / cfg["dir"]
+    r"""产品目录。
+
+    dir 字段历史上写作 `<Pkg>\dist\<Pkg>`（仓库内旧布局），2026-10-18
+    整体迁移后产品在仓库外 `<产品根>\<Pkg>`。这里取最后一段包名，经
+    `_paths.product_dir()` 统一解析——新根/回退/旧写法全部兼容，
+    39 份 yaml 无需改写也能正确指向。
+    """
+    rel = str(cfg["dir"]).replace("/", "\\").strip("\\")
+    pkg = rel.rsplit("\\", 1)[-1]
+    return _paths.product_dir(pkg)
 
 
 def app_root(cfg: dict) -> Path:

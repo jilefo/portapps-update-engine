@@ -1,21 +1,21 @@
 # -*- coding: utf-8 -*-
-r"""scaffold.py —— 为 39 个独立项目补齐双轨标准骨架
+r"""scaffold.py —— 【遗留】为 39 个独立项目补齐双轨标准骨架
+
+⚠ 状态：2026-10-17 双轨标准化时期的一次性工具，任务已完成（420 项，
+final_audit.py 39/39 通过）。**2026-10-18 起默认拒绝运行**：其模板会
+在包内生成 scripts/ tests/（精简约定已禁录）并写入 <Pkg>\dist\<Pkg>
+路径（产品已迁到仓库外 <产品根>）。误跑会把已合规的包打回旧形态。
+确需旧布局参考树时显式加 --legacy-layout。
 
 【职责边界】
 本脚本只做**补齐缺失项**，绝不覆盖已存在的文件（除非 --force）。
 以 TyporaPortable 的既有文件为模板（那是本仓库已验证合规的样板），
 把同样的骨架铺到其余项目，并修正迁移后失效的路径依赖。
 
-【迁移后必须修的问题】
-1. scripts/build-portable.py 里 MONO = REPO.parents[1] 指向 GreenSoftMake，
-   迁移到 PortableApps\<项目> 后推导出的 Work\_analysis 不存在 → 改为
-   经 scripts/toolchain.py 解析公共工具链。
-2. 原 Configs\<项目>.yaml 属于monorepo，现由 _shared/configs 统一托管，
-   各项目内不留副本（避免双份漂移）。
-
 用法：
-  python scaffold.py            # 预演，列出将要补齐的内容
-  python scaffold.py --execute  # 实际写入
+  python scaffold.py                      # 拒绝运行（上述护栏）
+  python scaffold.py --legacy-layout      # 预演，列出将要补齐的内容
+  python scaffold.py --legacy-layout --execute  # 实际写入
 """
 from __future__ import annotations
 
@@ -1079,7 +1079,23 @@ def main() -> int:
     ap.add_argument("--execute", action="store_true")
     ap.add_argument("--force", action="store_true",
                     help="覆盖已存在文件（默认只补缺失项）")
+    ap.add_argument("--legacy-layout", action="store_true",
+                    help="明知会生成旧布局（包内 scripts/ tests/ 与 dist 路径）"
+                         "仍要继续；默认拒绝，防止把已精简的仓库打回旧形态")
     args = ap.parse_args()
+
+    # 护栏：本工具是 2026-10-17 双轨标准化时期的遗留生成器，产出的包树
+    # 含 scripts/ tests/ 与 <Pkg>\dist\<Pkg> 路径——与 2026-10-18 精简约定
+    # （包内只放 portableapps/ docs/ .github/ 开源元数据）和 dist 外迁冲突。
+    # 今天误跑会把 39 个已合规包重新写入禁录目录。确需旧布局时显式加
+    # --legacy-layout（例如按旧标准重建一个一次性参考树）。
+    if not args.legacy_layout:
+        print("[拒绝] scaffold.py 为双轨标准化时期（2026-10-17）的遗留生成器，"
+              "其模板会写入包内 scripts/ tests/ 及 dist 旧路径。")
+        print("       当前仓库已按精简约定收敛（通用工具在 _shared/scripts/，"
+              "产品在仓库外 <产品根>）。")
+        print("       确需生成旧布局参考树：加 --legacy-layout 再跑。")
+        return 2
 
     meta_all = load_meta()
     plan: dict[str, list[tuple[str, str]]] = {}   # project -> [(rel, action)]

@@ -42,6 +42,10 @@ HERE = Path(__file__).resolve().parent
 REPO = HERE.parent.parent                      # <Repo>
 TOOLS = REPO / "_shared" / "tools"
 
+# 产品根唯一解析处（dist 迁移后由它接管产品路径）。
+sys.path.insert(0, str(REPO / "_shared"))
+import _paths                                     # noqa: E402
+
 UA = "PortableApps-release-bot/1.0 (+https://github.com/)"
 
 
@@ -129,14 +133,12 @@ def run(cmd, **kw):
 
 
 def packages():
-    """仓库根下真正的包（含 portableapps/ 或 dist/ 的一级目录）。"""
-    out = []
-    for d in sorted(REPO.iterdir()):
-        if not d.is_dir() or d.name.startswith("."):
-            continue
-        if (d / "portableapps").is_dir() or (d / "dist").is_dir():
-            out.append(d.name)
-    return out
+    """仓库根下真正的包（含 portableapps/ 或 dist/ 的一级目录）。
+
+    与 _paths.packages() 同源：迁移后仓库里仍有 portableapps/ 源树，
+    产物已迁到产品根，故「有 dist/」只是历史兼容条件，不依赖它也能枚举全。
+    """
+    return _paths.packages()
 
 
 def gates():
@@ -203,10 +205,11 @@ def check_versions():
     pkgs = packages()
     rows, bad, missing = [], [], []
     for pkg in pkgs:
-        vj = REPO / pkg / "dist" / pkg / "version.json"
+        # version.json 由更新引擎写进产品目录；迁移后跟随产品根
+        vj = _paths.product_dir(pkg) / "version.json"
         ai = appinfo_version(REPO / pkg / "portableapps/App/AppInfo/appinfo.ini")
         if ai is None:
-            ai = appinfo_version(REPO / pkg / "dist" / pkg /
+            ai = appinfo_version(_paths.product_dir(pkg) /
                                  "App/AppInfo/appinfo.ini")
         if not vj.is_file():
             missing.append(pkg)

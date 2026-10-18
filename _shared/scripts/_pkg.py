@@ -10,7 +10,10 @@ import os as _os
 import sys as _sys
 from pathlib import Path as _Path
 
-REPO_ROOT = _Path(__file__).resolve().parents[2]   # _shared/scripts -> 仓库根
+_sys.path.insert(0, str(_Path(__file__).resolve().parents[1]))
+import _paths                                     # noqa: E402
+
+REPO_ROOT = _paths.REPO_ROOT                      # _shared/scripts -> 仓库根
 
 
 def pkg_name():
@@ -29,14 +32,11 @@ def list_packages():
     用来在包名解析失败时给出可用清单，而不是把用户引向一个
     根本不存在的目录（旧行为：从仓库根跑脚本会推出 PKG=<仓库目录名>，
     然后报一串"缺 appinfo.ini"的假错）。
+
+    判定逻辑与 _paths.packages() 同源（唯一实现），迁移后产物去了仓库外的
+    产品根，portableapps/ 仍在仓库里，枚举不受影响。
     """
-    out = []
-    for d in sorted(REPO_ROOT.iterdir()):
-        if not d.is_dir() or d.name.startswith("."):
-            continue
-        if (d / "portableapps").is_dir() or (d / "dist").is_dir():
-            out.append(d.name)
-    return out
+    return _paths.packages()
 
 
 PKG = pkg_name()

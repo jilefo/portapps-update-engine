@@ -1,13 +1,20 @@
 # -*- coding: utf-8 -*-
 """gen-sbom.py —— 生成 SPDX SBOM（通用版，包名自动推导）
 
-只依赖标准库，输出 dist/sbom.spdx.json。
+只依赖标准库，输出 <打包暂存根>/sbom.spdx.json（迁移前 dist/、迁移后产品根）。
 SBOM 记录本仓库便携化配置与原程序文件清单（不做依赖解析）。
+
+注：sbom 是**构建产物**、不是产品文件，故不写进产品目录内部——
+否则会撞 test_structure.py 的「产物根目录多出文件」白名单。
+迁移后所有包共用产品根下的 sbom.spdx.json（按包生成后即被消费，
+需要留档请在生成后改名 <Pkg>.sbom.spdx.json）。
 """
 import sys as _sys
 from pathlib import Path as _Path
 _sys.path.insert(0, str(_Path(__file__).resolve().parent))
+_sys.path.insert(0, str(_Path(__file__).resolve().parents[1]))
 from _pkg import PKG, REPO, REPO_ROOT   # noqa: E402
+import _paths                          # noqa: E402
 
 import hashlib
 import json
@@ -18,7 +25,7 @@ from pathlib import Path
 
 
 
-DIST = REPO / "dist"
+DIST = _paths.artifact_root(PKG)
 NAMESPACE = "https://greensoftmake.local/spdx/" + PKG
 
 
@@ -31,7 +38,7 @@ def sha256(path):
 
 
 def main():
-    pkg_dir = DIST / PKG
+    pkg_dir = _paths.product_dir(PKG)
     if not pkg_dir.is_dir():
         print("[FAIL] 先运行 build-portable.py 生成 " + str(pkg_dir))
         return 1

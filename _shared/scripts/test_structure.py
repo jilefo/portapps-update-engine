@@ -3,7 +3,9 @@
 import sys as _sys
 from pathlib import Path as _Path
 _sys.path.insert(0, str(_Path(__file__).resolve().parent))
+_sys.path.insert(0, str(_Path(__file__).resolve().parents[1]))
 from _pkg import PKG, REPO, REPO_ROOT   # noqa: E402
+import _paths                          # noqa: E402
 
 import configparser
 import sys
@@ -11,7 +13,8 @@ from pathlib import Path
 
 
 
-DIST = REPO / "dist" / PKG
+# 产品树（迁移后为 <产品根>/<Pkg>，未迁移自动回退 <Repo>/<Pkg>/dist/<Pkg>）
+DIST = _paths.product_dir(PKG)
 
 ENCODINGS = ("utf-8-sig", "utf-16", "utf-8", "gb18030", "latin-1")
 
@@ -48,12 +51,13 @@ def main() -> int:
             if not (REPO / rel).is_file():
                 errors.append(f"缺仓库文件 {rel}")
 
-    # 2. dist 产物
+    # 2. 产物结构
     if not ini_only:
         if not DIST.is_dir():
             errors.append(
-                f"dist 产物不存在: {DIST}"
-                f"（先运行 _shared/scripts/build-portable.py {PKG}）")
+                f"产物目录不存在: {DIST}"
+                f"（产品根={_paths.product_root()}，来源：{_paths.product_root_source()}；"
+                f"先运行 _shared/scripts/build-portable.py {PKG}）")
         else:
             root_files = [p.name for p in DIST.iterdir() if p.is_file()]
             # version.json = 更新引擎写入的版本元数据（current/previous/
@@ -69,10 +73,10 @@ def main() -> int:
             # 早期版本忽略这点，导致 WPS 被误判 FAIL。
             extra = {e for e in extra if not e.endswith("Portable.exe")}
             if extra:
-                errors.append(f"dist 根目录多出文件: {sorted(extra)}")
+                errors.append(f"产物根目录多出文件: {sorted(extra)}")
             for d in ("App", "Other"):
                 if not (DIST / d).is_dir():
-                    errors.append(f"dist 缺目录: {d}")
+                    errors.append(f"产物缺目录: {d}")
 
     # 3. appinfo.ini 必填字段
     ai = REPO / "portableapps" / "App" / "AppInfo" / "appinfo.ini"

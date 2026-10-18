@@ -30,6 +30,8 @@ from datetime import date
 from pathlib import Path
 
 REPO_ROOT = os.environ.get("PORTABLEAPPS_ROOT") or str(Path(__file__).resolve().parents[2])
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # 定位 _paths
+import _paths                                   # noqa: E402
 STAMP = date.today().strftime("%Y%m%d")
 
 # 捕获整个 NP_JunctionProbe 宏
@@ -44,7 +46,7 @@ RE_PS = re.compile(r"^\s*nsExec::ExecToStack\s+'.*?\.np-helpers\.ps1.*?'\s*$", r
 RE_POPS = re.compile(r"^\s*Pop\s+\S+\s*$", re.M)
 
 TEMPLATE = """{i}!macro NP_JunctionProbe _HOST _TARGET _TAG _RESULT
-{i}    ; [卡顿优化 {stamp}] 原实现无条件调用 PowerShell（单次实测 1.37s），
+{i}    ; [卡顿优化 {stamp} | 标记 junc-probe-fast] 原实现无条件调用 PowerShell（单次实测 1.37s），
 {i}    ; QQ 系一次冷启动要十几次，累计 ~16s。改为 NSIS 原生快速路径：
 {i}    ;   ① TARGET 里写探针文件，HOST 下可见      -> 0 本包所有（崩溃残留）
 {i}    ;   ② 否则试探 HOST 是否可写，不可写        -> 3 联接目标已失效
@@ -92,7 +94,10 @@ def patch_file(path: Path, apply: bool) -> str:
     if not m:
         return "no-macro"
     body = m.group("body")
-    if "junc-probe-fast" in body:
+    # 幂等标记 = 模板产出的探针名前缀 "junc-probe-"（只在快速路径里出现，
+    # 未打补丁的宏体内没有）。早期版本检查 "junc-probe-fast"，但模板注释里
+    # 从未吐出该完整串 → 已修补文件被误判为待打，--apply 会重复打补丁。
+    if "junc-probe-" in body:
         return "already"
     psl = RE_PS.search(body)
     if not psl:
@@ -115,16 +120,24 @@ def main() -> int:
     apply = "--apply" in sys.argv
     root = Path(REPO_ROOT)
     stats = {}
-    for nsh in sorted(root.glob("*/dist/*/App/AppInfo/Launcher/Custom.nsh")):
+    # 产物树 Custom.nsh：迁移前 <Repo>/<Pkg>/dist/<Pkg>/...，
+    # 迁移后 <产品根>/<Pkg>/... —— 统一经 _paths.custom_nsh_files() 枚举
+    # （老 glob 在迁移后会扫到 0 个文件而假绿）。
+    prod_files = _paths.custom_nsh_files()
+    print("产物根: %s（来源 %s）| 产品树 Custom.nsh %d 个"
+          % (_paths.product_root(), _paths.product_root_source(),
+             len(prod_files)))
+    for pkg, nsh in prod_files:
         r = patch_file(nsh, apply)
         stats[r] = stats.get(r, 0) + 1
         if r == "patched":
-            print(f"  [改] {nsh.parents[5].name}/dist")
+            print(f"  [改] {pkg}/dist")
     for nsh in sorted(root.glob("*/portableapps/App/AppInfo/Launcher/Custom.nsh")):
         r = patch_file(nsh, apply)
         stats[r] = stats.get(r, 0) + 1
         if r == "patched":
-            print(f"  [改] {nsh.parents[5].name}/source")
+            # parents: 0=Launcher 1=AppInfo 2=App 3=portableapps 4=<Pkg>
+            print(f"  [改] {nsh.parents[4].name}/source")
     print("\n统计:", stats)
     if not apply:
         print("（dry-run，未写盘；加 --apply 生效，会自动留 .bak-jprobe 备份）")

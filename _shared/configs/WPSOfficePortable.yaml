@@ -9,7 +9,7 @@ version_source:
   note: 无已验证在线版本源；人工下载后 ingest 接管
 package_type: unknown
 extract_strategy: manual_fallback
-entry_exe: office6\wps.exe
+entry_exe: office6\wpsoffice.exe
 app_subdir: office6
 launcher_args: []
 data_dir: Data

@@ -13,6 +13,21 @@ import configparser
 import json
 import os
 import sys
+from pathlib import Path
+
+# >>> 路径自适应（开源迁移注入，勿删）：仓库根由本文件位置推导，
+#     不再写死绝对路径，可用 PORTABLEAPPS_ROOT 环境变量覆盖。
+import os as _os
+from pathlib import Path as _Path
+REPO_ROOT = (_os.environ.get("PORTABLEAPPS_ROOT")
+             or str(_Path(__file__).resolve().parents[2]))
+REPO_ROOT_F = REPO_ROOT.replace("\\", "/")
+_TOOLS_DIR_F = str(_Path(__file__).resolve().parent).replace("\\", "/")
+# <<< 路径自适应
+
+# 产品树位置统一由 _paths 解析（迁移后产品根、迁移前仓库 dist）
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import _paths                                     # noqa: E402
 
 ROOT = REPO_ROOT
 
@@ -35,46 +50,36 @@ def scan():
     projects = []
     for name in sorted(os.listdir(ROOT)):
         proj = os.path.join(ROOT, name)
-        if not os.path.isdir(proj) or name.startswith('_'):
+        if not os.path.isdir(proj) or name.startswith(('_', '.')):
             continue
-        dist = os.path.join(proj, 'dist')
-        if not os.path.isdir(dist):
-            projects.append(dict(name=name, error='no dist'))
+        # 产品目录：迁移后 <产品根>/<Pkg>，迁移前 <Repo>/<Pkg>/dist/<Pkg>
+        inner = _paths.product_dir(name)
+        if not os.path.isdir(inner):
+            projects.append(dict(name=name, error='no product dir'))
             continue
-        # dist\<Pkg>\<Pkg>.exe
-        inner = None
-        for d in os.listdir(dist):
-            p = os.path.join(dist, d)
-            if os.path.isdir(p) and d == name:
-                inner = p
-                break
-        if inner is None:
-            # 兜底：dist 下唯一目录
-            dirs = [d for d in os.listdir(dist) if os.path.isdir(os.path.join(dist, d))]
-            if len(dirs) == 1:
-                inner = os.path.join(dist, dirs[0])
         exe = None
-        if inner:
-            cand = os.path.join(inner, name + '.exe')
-            exe = cand if os.path.isfile(cand) else None
+        cand = os.path.join(inner, name + '.exe')
+        exe = cand if os.path.isfile(cand) else None
         # appinfo
         appinfo = None
         cmd = None
-        if inner:
-            ai = os.path.join(inner, 'App', 'AppInfo', 'appinfo.ini')
-            if os.path.isfile(ai):
-                cp = read_ini(ai)
-                if cp and cp.has_section('Launch'):
-                    cmd = cp.get('Launch', 'Command', fallback=None)
+        ai = os.path.join(inner, 'App', 'AppInfo', 'appinfo.ini')
+        if os.path.isfile(ai):
+            cp = read_ini(ai)
+            if cp and cp.has_section('Launch'):
+                cmd = cp.get('Launch', 'Command', fallback=None)
+                try:
                     appinfo = os.path.relpath(ai, proj)
-            if cmd is None:
-                ai2 = os.path.join(inner, 'App', 'AppInfo', 'Launcher', 'Custom.nsh')
-                if os.path.isfile(ai2):
-                    appinfo = (appinfo or '') + ' +Custom.nsh'
+                except ValueError:
+                    appinfo = str(ai)      # 产品根在仓库外
+        if cmd is None:
+            ai2 = os.path.join(inner, 'App', 'AppInfo', 'Launcher', 'Custom.nsh')
+            if os.path.isfile(ai2):
+                appinfo = (appinfo or '') + ' +Custom.nsh'
         # Data 现状
-        data = os.path.join(inner, 'Data') if inner else None
+        data = os.path.join(inner, 'Data')
         data_stat = None
-        if data and os.path.isdir(data):
+        if os.path.isdir(data):
             nf = 0
             tot = 0
             last = 0.0

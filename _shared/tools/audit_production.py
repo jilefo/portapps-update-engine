@@ -29,7 +29,13 @@ r"""audit_production.py —— 便携软件生产级静态审计（开源完备�
 import configparser
 import json
 import os
+import sys as _sys
 from datetime import datetime
+
+# 产品根唯一解析处（dist 迁移到 D:\Portapps 后由它接管路径）。
+# 不放 try/except：_paths.py 缺失本身就是必须立刻发现的故障。
+_sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import _paths                                     # noqa: E402
 
 ROOT = REPO_ROOT
 OUT = REPO_ROOT + r"\docs\reports"
@@ -89,17 +95,26 @@ def pkg_dirs():
 
 
 def launcher_inis(name, base):
-    """返回 (dist, portableapps) 两棵树下的 launcher ini 绝对路径"""
+    r"""返回 (产品树, portableapps 源树) 两处的 launcher ini 绝对路径。
+
+    产品树从 _paths.product_dir() 取：迁移后是 D:\Portapps\<Pkg>，
+    迁移前回退到 <Repo>/<Pkg>/dist/<Pkg>，两者对审计透明。
+    """
     res = []
-    for tree in ("dist", "portableapps"):
-        d = os.path.join(base, tree, name, "App", "AppInfo", "Launcher")
+    prod = _paths.product_dir(name)
+    for d in (os.path.join(str(prod), "App", "AppInfo", "Launcher"),
+              os.path.join(base, "portableapps", "App", "AppInfo", "Launcher")):
         if not os.path.isdir(d):
-            d = os.path.join(base, tree, "App", "AppInfo", "Launcher")
-        if os.path.isdir(d):
-            for f in sorted(os.listdir(d)):
-                if f.lower().endswith(".ini"):
-                    res.append(os.path.join(d, f))
+            continue
+        for f in sorted(os.listdir(d)):
+            if f.lower().endswith(".ini"):
+                res.append(os.path.join(d, f))
     return res
+
+
+def dist_path(name, *rel):
+    """产品树下的相对路径。dist 迁移后自动指向 D:\\Portapps\\<Pkg>。"""
+    return os.path.join(str(_paths.product_dir(name)), *rel)
 
 
 def audit_pkg(name, base):
@@ -114,15 +129,21 @@ def audit_pkg(name, base):
         if not os.path.isdir(os.path.join(base, d)):
             r["oss_missing"].append(d + "/")
     # B PAL 结构
-    exe = os.path.join(base, "dist", name, name + ".exe")
+    exe = dist_path(name, name + ".exe")
     if not os.path.isfile(exe):
-        r["struct_missing"].append("dist/%s/%s.exe" % (name, name))
-    for rel in ("dist/%s/App/AppInfo/appinfo.ini" % name,
-                "dist/%s/App/AppInfo/Launcher/%s.ini" % (name, name),
-                "dist/%s/help.html" % name,
-                "dist/%s/Other/Source" % name,
-                "portableapps/App/AppInfo/appinfo.ini"):
-        p = os.path.join(base, rel.replace("/", os.sep))
+        r["struct_missing"].append("%s.exe" % name)
+    checks = (
+        ("%s.exe" % name, exe),
+        ("App/AppInfo/appinfo.ini",
+         dist_path(name, "App", "AppInfo", "appinfo.ini")),
+        ("App/AppInfo/Launcher/%s.ini" % name,
+         dist_path(name, "App", "AppInfo", "Launcher", name + ".ini")),
+        ("help.html", dist_path(name, "help.html")),
+        ("Other/Source", dist_path(name, "Other", "Source")),
+        ("portableapps/App/AppInfo/appinfo.ini",
+         os.path.join(base, "portableapps", "App", "AppInfo", "appinfo.ini")),
+    )
+    for rel, p in checks:
         if not os.path.isfile(p) and not os.path.isdir(p):
             r["struct_missing"].append(rel)
     # C 数据落地
@@ -166,15 +187,15 @@ def audit_pkg(name, base):
     # appinfo ExtractIcon 目标存在性
     ai = os.path.join(base, "portableapps", "App", "AppInfo", "appinfo.ini")
     if not os.path.isfile(ai):
-        ai = os.path.join(base, "dist", name, "App", "AppInfo", "appinfo.ini")
+        ai = dist_path(name, "App", "AppInfo", "appinfo.ini")
     if os.path.isfile(ai):
         cp = read_ini(ai)
         if cp and cp.has_option("Control", "ExtractIcon"):
             ic = cp.get("Control", "ExtractIcon").replace("/", os.sep)
-            # 应用二进制在 dist/<Pkg>/App 下（portableapps 源树只有元数据 +
+            # 应用二进制在产品树下（portableapps 源树只有元数据 +
             # DefaultData，直接查 portableapps 会 100% 误报）
-            cands = [os.path.join(base, "dist", name, "App", ic),
-                     os.path.join(base, "dist", name, ic),
+            cands = [dist_path(name, "App", ic),
+                     dist_path(name, ic),
                      os.path.join(base, "portableapps", "App", ic)]
             if not any(os.path.isfile(c) for c in cands):
                 r["risks"].append("ExtractIcon 目标缺失: %s"
@@ -190,7 +211,10 @@ def md(results):
     risk_bad = [r for r in results if r["risks"]]
     L = ["# 便携软件生产级静态审计", "",
          "- 生成时间：%s" % datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-         "- 包总数：%d" % n, "",
+         "- 包总数：%d" % n,
+         "- 产品根：`%s`（来源：%s）"
+         % (_paths.product_root(), _paths.product_root_source()),
+         "",
          "## 1. 总览", "",
          "| 维度 | 合格 | 缺口 |", "|---|---|---|",
          "| 开源完备性（9 项） | %d | %d |" % (n - len(oss_bad), len(oss_bad)),
@@ -232,6 +256,8 @@ def main():
     os.makedirs(OUT, exist_ok=True)
     pkgs = pkg_dirs()
     results = [audit_pkg(n, p) for n, p in pkgs]
+    print("产品根:", _paths.product_root(), "（来源：%s）"
+          % _paths.product_root_source())
     mp = os.path.join(OUT, "生产级审计-%s.md" % STAMP)
     jp = os.path.join(OUT, "生产级审计-%s.json" % STAMP)
     with open(mp, "w", encoding="utf-8") as f:

@@ -31,10 +31,12 @@ import time
 import psutil
 
 sys.path.insert(0, _TOOLS_DIR_F)
+sys.path.insert(0, _Path(__file__).resolve().parents[1])
 import smoke_real as sr
+import _paths                                     # noqa: E402
 
-BASE = (REPO_ROOT + r"\WPSOfficePortable\dist"
-        r"\WPSOfficePortable")
+# 产品目录：迁移后 <产品根>/WPSOfficePortable，迁移前仓库 dist 树
+BASE = str(_paths.product_dir("WPSOfficePortable"))
 OUT = _TOOLS_DIR_F
 KILL = ("wps.exe", "et.exe", "wpp.exe", "wpspdf.exe", "wpsoffice.exe",
         "wpscloudsvr.exe", "promecefpluginhost.exe", "kwinappinstaller.exe",

@@ -26,6 +26,7 @@ import argparse
 import importlib.util
 import json
 import os
+import re
 import shutil
 import sys
 import time
@@ -41,11 +42,10 @@ _spec = importlib.util.spec_from_file_location(
 _apr = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_apr)
 
-# 硬排除：这三类一律不动
-EXCLUDE_RES = [
-    _apr.DATA_DIR_RE,                                    # 用户数据
-    re.compile(r"^(?:[^/]+/)?dist/") if False else None,  # 占位，见下方显式判断
-]
+# 硬排除逻辑统一在 is_excluded()（三类：用户数据 / 回滚备份 / dist 子树），
+# 判定标准复用 audit_pre_release，避免两套标准漂移。
+# 注：2026-10-18 迁移后产品在仓库外 <产品根>，仓库内 dist/ 不再产生，
+# "dist 子树"排除项对回退布局（本地构建）仍然生效，属保留项。
 
 
 def is_excluded(rel):
@@ -165,5 +165,4 @@ def do_rollback(manifest_path):
 
 
 if __name__ == "__main__":
-    import re
     raise SystemExit(main())

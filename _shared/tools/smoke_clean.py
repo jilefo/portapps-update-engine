@@ -36,6 +36,10 @@ try:
 except ImportError:
     sys.exit('psutil 未安装')
 
+# 产品根唯一解析处（dist 迁移到 D:\Portapps 后由它接管产品路径）。
+sys.path.insert(0, str(_Path(__file__).resolve().parents[1]))
+import _paths                                     # noqa: E402
+
 ROOT = REPO_ROOT
 CHILD_WAIT_S = 25
 WRITE_SETTLE_S = 6
@@ -46,21 +50,27 @@ STAMP = datetime.now().strftime('%Y%m%d-%H%M%S')
 # 宿主污染变量：会改变 Electron/Node 应用运行模式的，一律剥离
 STRIP_ENV = ('ELECTRON_RUN_AS_NODE', 'NODE_OPTIONS', 'NODE_EXTRA_CA_CERTS')
 
+
+def _prod(pkg):
+    """产品目录字符串：迁移后 <产品根>/<Pkg>，迁移前 <Repo>/<Pkg>/dist/<Pkg>。"""
+    return str(_paths.product_dir(pkg))
+
+
 MANUAL = [
-    dict(name='KukuAIPortable',
-         exe=os.path.join(ROOT, 'KukuAIPortable', 'dist', 'KukuAIPortable', 'KukuAIPortable.exe'),
+    dict(name='KukuAIPortable', pkg='KukuAIPortable',
+         exe=os.path.join(_prod('KukuAIPortable'), 'KukuAIPortable.exe'),
          cmd='GenFlowPro.exe'),
-    dict(name='WPSOfficePortable-Writer',
-         exe=os.path.join(ROOT, 'WPSOfficePortable', 'dist', 'WPSOfficePortable', 'WriterPortable.exe'),
+    dict(name='WPSOfficePortable-Writer', pkg='WPSOfficePortable',
+         exe=os.path.join(_prod('WPSOfficePortable'), 'WriterPortable.exe'),
          cmd='wps.exe'),
-    dict(name='WPSOfficePortable-Spreadsheets',
-         exe=os.path.join(ROOT, 'WPSOfficePortable', 'dist', 'WPSOfficePortable', 'SpreadsheetsPortable.exe'),
+    dict(name='WPSOfficePortable-Spreadsheets', pkg='WPSOfficePortable',
+         exe=os.path.join(_prod('WPSOfficePortable'), 'SpreadsheetsPortable.exe'),
          cmd='et.exe'),
-    dict(name='WPSOfficePortable-Presentation',
-         exe=os.path.join(ROOT, 'WPSOfficePortable', 'dist', 'WPSOfficePortable', 'PresentationPortable.exe'),
+    dict(name='WPSOfficePortable-Presentation', pkg='WPSOfficePortable',
+         exe=os.path.join(_prod('WPSOfficePortable'), 'PresentationPortable.exe'),
          cmd='wpp.exe'),
-    dict(name='WPSOfficePortable-PDF',
-         exe=os.path.join(ROOT, 'WPSOfficePortable', 'dist', 'WPSOfficePortable', 'wpsPDFPortable.exe'),
+    dict(name='WPSOfficePortable-PDF', pkg='WPSOfficePortable',
+         exe=os.path.join(_prod('WPSOfficePortable'), 'wpsPDFPortable.exe'),
          cmd='wpsoffice.exe'),
 ]
 SKIP = {'WPSOfficePortable'}
@@ -264,16 +274,36 @@ def kill_tree(pid):
 
 
 def load_projects():
-    with open(os.path.join(os.path.dirname(__file__), '_projects_index.json'), encoding='utf-8') as f:
-        rows = json.load(f)
-    projs = []
+    """加载待测单元。
+
+    _projects_index.json 里存的是**迁移前**的 exe 绝对路径（dist 树下），
+    迁移后全部失效。故只从索引取 name/cmd，exe 一律按当前产品根重算：
+      标准单元  <产品目录>/<Pkg>.exe
+    索引本身缺失/过期也不阻断——以产品目录是否存在为准，缺则明确跳过并计数。
+    """
+    idx = os.path.join(os.path.dirname(__file__), '_projects_index.json')
+    rows = []
+    if os.path.isfile(idx):
+        with open(idx, encoding='utf-8') as f:
+            rows = json.load(f)
+    projs, missing = [], []
     for r in rows:
         if r['name'] in SKIP or not r.get('exe'):
             continue
-        projs.append(dict(name=r['name'], exe=r['exe'], cmd=(r.get('cmd') or '').strip()))
+        exe = os.path.join(_prod(r['name']), r['name'] + '.exe')
+        if not os.path.isfile(exe):
+            missing.append(r['name'])
+            continue
+        projs.append(dict(name=r['name'], exe=exe, cmd=(r.get('cmd') or '').strip()))
     for m in MANUAL:
         if os.path.isfile(m['exe']):
             projs.append(m)
+        else:
+            missing.append(m['name'])
+    if missing:
+        print(f"[warn] {len(missing)} 个单元产品目录缺失，已跳过: "
+              f"{', '.join(missing)}（产品根={_paths.product_root()}，"
+              f"来源：{_paths.product_root_source()}）", flush=True)
     return projs
 
 

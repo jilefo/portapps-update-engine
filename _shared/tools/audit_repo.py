@@ -27,6 +27,7 @@ import configparser
 import os
 import re
 import sys
+import sys as _sys
 from pathlib import Path
 
 # >>> 复用 check_custom_nsh 的病态扫描器（单一事实来源，避免两份实现再次漂移）。
@@ -36,6 +37,27 @@ if str(_TOOLS_DIR) not in sys.path:
     sys.path.insert(0, str(_TOOLS_DIR))
 from check_custom_nsh import scan_file as _scan_nsh  # noqa: E402
 # <<<
+
+# >>> 产品根唯一解析处：dist 迁到 D:\Portapps 后，dist 树随之离开仓库，
+#     本工具的 dist 审计必须改为读产品根，否则克隆/CI 与迁移后本机表现不一致。
+_sys.path.insert(0, str(_TOOLS_DIR.parent))       # _shared/
+import _paths                                     # noqa: E402
+# <<<
+
+
+def tree_root(pkg: Path, tree: str) -> Path:
+    """树根目录。
+
+    - `portableapps`：恒在仓库内，随 git 分发
+    - `dist`：仓库内已装配则用仓库内（迁移前的状态）；否则用产品根
+      （迁移后 D:\\Portapps\\<Pkg>，克隆里回退成空目录）
+    """
+    if tree == "portableapps":
+        return pkg / "portableapps"
+    for cand in (pkg / "dist" / pkg.name, pkg / "dist"):
+        if (cand / "App").is_dir():
+            return cand
+    return _paths.product_dir(pkg.name)
 
 # >>> 路径自适应：仓库根由本文件位置推导，可用 PORTABLEAPPS_ROOT 覆盖
 REPO_ROOT = os.environ.get("PORTABLEAPPS_ROOT") or str(
@@ -87,12 +109,11 @@ def tree_populated(pkg, tree):
     clone / CI 环境里 <Pkg>/dist/ 下只有 update.py 与 version.json
     （程序二进制被 .gitignore 排除），强行审计 dist 树会全员误报
     「缺 appinfo.ini」——这正是开源后 CI 假红的根因。
+    dist 迁到 D:\Portapps 后由 tree_root() 改读产品根，本函数随之生效。
     """
-    for base in (pkg / tree / "App", pkg / tree / pkg.name / "App"):
-        if (base / "AppInfo" / "Launcher").is_dir() \
-                or (base / "AppInfo" / "appinfo.ini").is_file():
-            return True
-    return False
+    base = tree_root(pkg, tree)
+    return ((base / "App" / "AppInfo" / "Launcher").is_dir()
+            or (base / "App" / "AppInfo" / "appinfo.ini").is_file())
 
 
 def resolve_trees(pkg, requested, explicit):
@@ -119,8 +140,9 @@ def check_meta(pkg, fails):
 
 def appinfo_path(pkg, tree):
     """dist 树为 dist/<Pkg>/App/AppInfo/，源树为 portableapps/App/AppInfo/"""
-    for p in (pkg / tree / "App" / "AppInfo" / "appinfo.ini",
-              pkg / tree / pkg.name / "App" / "AppInfo" / "appinfo.ini"):
+    base = tree_root(pkg, tree)
+    for p in (base / "App" / "AppInfo" / "appinfo.ini",
+              base / pkg.name / "App" / "AppInfo" / "appinfo.ini"):
         if p.is_file():
             return p
     return None
@@ -173,9 +195,10 @@ def check_appinfo(pkg, tree, fails):
 
 def check_launcher(pkg, tree, fails, notes):
     name = pkg.name
-    d = pkg / tree / "App" / "AppInfo" / "Launcher"
+    base = tree_root(pkg, tree)
+    d = base / "App" / "AppInfo" / "Launcher"
     if not d.is_dir():
-        d = pkg / tree / name / "App" / "AppInfo" / "Launcher"
+        d = base / name / "App" / "AppInfo" / "Launcher"
     if not d.is_dir():
         fails.append("[%s] 缺 Launcher 目录" % tree)
         return
@@ -215,9 +238,10 @@ def check_launcher(pkg, tree, fails, notes):
 
 
 def check_custom_nsh(pkg, tree, fails):
-    p = pkg / tree / "App" / "AppInfo" / "Launcher" / "Custom.nsh"
+    base = tree_root(pkg, tree)
+    p = base / "App" / "AppInfo" / "Launcher" / "Custom.nsh"
     if not p.is_file():
-        p = pkg / tree / pkg.name / "App" / "AppInfo" / "Launcher" / "Custom.nsh"
+        p = base / pkg.name / "App" / "AppInfo" / "Launcher" / "Custom.nsh"
     if not p.is_file():
         return
     raw = p.read_bytes()

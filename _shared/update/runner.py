@@ -26,21 +26,22 @@ from datetime import datetime
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import _paths                                     # noqa: E402
 REPORT_DIR = REPO_ROOT / "docs" / "reports"
 
 
 def find_scripts():
+    """找每个包的更新脚本 <产品目录>/update.py。
+
+    迁移前在 <Repo>/<Pkg>/dist/<Pkg>/，迁移后随包到 <产品根>/<Pkg>/，
+    由 _paths 统一解析；返回 [(包名, 脚本路径)]，缺 update.py 的包不进列表。
+    """
     out = []
-    for pkgdir in sorted(REPO_ROOT.iterdir()):
-        if not pkgdir.is_dir():
-            continue
-        dist = pkgdir / "dist"
-        if not dist.is_dir():
-            continue
-        for d in sorted(dist.iterdir()):
-            f = d / "update.py"
-            if d.is_dir() and f.is_file():
-                out.append((d.name, f))
+    for pkg in _paths.packages():
+        f = _paths.product_dir(pkg) / "update.py"
+        if f.is_file():
+            out.append((pkg, f))
     return out
 
 
@@ -55,7 +56,10 @@ def run_one(name, script, extra, timeout=90):
             line = line.strip()
             if line.startswith("{") and line.endswith("}"):
                 d = json.loads(line)
-                d["script"] = str(script.relative_to(REPO_ROOT))
+                try:
+                    d["script"] = str(script.relative_to(REPO_ROOT))
+                except ValueError:
+                    d["script"] = str(script)   # 产品根在仓库外
                 return d
         return dict(pkg=name, source="?", current=None, latest=None,
                     has_update=None, status="ERR",

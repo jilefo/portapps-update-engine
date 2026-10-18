@@ -2,12 +2,15 @@
 r"""update_template.py —— 「一包一更新脚本」的自包含模板
 
 **这是模板，不要直接运行。** 由 `_shared/tools/gen_update_strategies.py`
-读取本文件、替换占位符后，输出 `dist/<Pkg>/update.py`。
+读取本文件、替换占位符后，输出 `<产品目录>/update.py`
+（迁移前 dist/<Pkg>/，2026-10-18 起 <产品根>/<Pkg>/）。
 
 为什么自包含（而不是 import 公共库）：
-  用户拿到的是 `dist/<Pkg>/` 这个目录，常常整个拷走，此时仓库里的
+  用户拿到的是产品目录这一整个文件夹，常常整个拷走，此时仓库里的
   `_shared/` 并不在旁边。更新脚本必须能单目录独立运行，所以引擎代码
   直接内联。代价是有重复，收益是"拷走就能用"，这个取舍是值得的。
+  代价的补偿：仓库根用「探测式」定位（环境变量 PORTABLEAPPS_REPO 或
+  逐级上溯找 _shared/），拷走后找不到仓库就自动退临时目录，不崩。
 
 模板里所有占位符都写成**合法的 Python 字面量**，这样 `compileall`
 不会把模板本身报成语法错误。
@@ -39,24 +42,43 @@ from datetime import datetime
 from pathlib import Path
 
 # ---------------------------------------------------------------- 路径推导
-# update.py 位于 dist/<Pkg>/ 下，所以要上溯三级：
-#   HERE        = <Repo>/<Pkg>/dist/<Pkg>      便携包目录（= EXEDIR）
-#   HERE.parent = <Repo>/<Pkg>/dist
-#   parents[1]  = <Repo>/<Pkg>                 包根目录
-#   parents[2]  = <Repo>                       仓库根（_shared/ 所在）
+# 布局（2026-10-18 迁移后）：
+#   HERE        = <产品根>/<Pkg>      便携包目录（= EXEDIR）
+#   HERE.parent = <产品根>
+# 迁移前是 <Repo>/<Pkg>/dist/<Pkg>，上溯三级能到仓库根；迁移后本脚本在
+# 仓库外，固定级数上溯会推出 D:\ 这种错误根。故改为**探测式**：
+#   1) 环境变量 PORTABLEAPPS_REPO（迁移后显式告知仓库位置）
+#   2) 从 HERE 逐级上溯，找同时含 _shared/update 与 _shared/scripts 的目录
+#   3) 都找不到 → None：缓存/备份退到临时目录，结构校验明确跳过
 HERE = Path(__file__).resolve().parent
-PKG_ROOT = HERE.parents[1]
-REPO_ROOT = HERE.parents[2]
 PKG = HERE.name
+PKG_ROOT = HERE.parent
 
-# 目录**按需创建**，不在导入时 mkdir —— 否则每跑一次 --check 就给 39 个包
+
+def _find_repo_root():
+    env = os.environ.get("PORTABLEAPPS_REPO")
+    if env and (Path(env) / "_shared" / "scripts").is_dir():
+        return Path(env)
+    for p in [HERE] + list(HERE.parents):
+        if (p / "_shared" / "scripts").is_dir() and (p / "_shared" / "update").is_dir():
+            return p
+    return None
+
+
+REPO_ROOT = _find_repo_root()
+
+# 目录**按需创建**，不在导入时 mkdir —— 否则每跑一次 --check 就给每个包
 # 各建一个空目录，纯噪音。真正要写的时候再建（见 download / install）。
+# 仓库找不到时（单拷走 / 迁移后未设 PORTABLEAPPS_REPO）退到临时目录，
+# 保证脚本永远能跑，只是缓存不跨机器共享。
 try:
+    if REPO_ROOT is None:
+        raise OSError("仓库根未定位（脱离仓库运行）")
     _probe = REPO_ROOT / "_shared" / "update"
     _probe.mkdir(parents=True, exist_ok=True)
     CACHE = _probe / "_cache" / PKG
     BACKUP_ROOT = _probe / "_backups" / PKG
-except OSError:                                         # 单拷走、无写权限
+except OSError:                                     # 单拷走、无写权限、脱离仓库
     import tempfile
     _t = Path(tempfile.gettempdir()) / "portable-update" / PKG
     CACHE = _t / "_cache"
@@ -321,7 +343,7 @@ class Strategy:
            `core/` + `setup.exe`，正主在 `core/` 里）。
         1. 剥掉单层外壳目录（zip 常解出 `SoloMD_5.0.3/...`，多一层就找不到入口）。
         2. 剔除上游自带的 `Data/`——PAL 用 `[Environment]` 把数据重定向到
-           `dist/<Pkg>/Data/`，用上游的会把用户数据写进 App 里。
+           `<产品目录>/Data/`，用上游的会把用户数据写进 App 里。
         3. 禁用上游自带更新器——`update_installer.exe` / `updater.exe` /
            `zUpdater.exe` 一旦跑起来，会把便携版改写成安装版。
         """
@@ -468,6 +490,10 @@ class Strategy:
 
     # ---- 冒烟验证 ----
     def verify(self):
+        if REPO_ROOT is None:
+            log("  [跳过结构校验] 未定位仓库根（迁移后在仓库外运行）；"
+                "设环境变量 PORTABLEAPPS_REPO=<仓库路径> 可恢复")
+            return None
         t = REPO_ROOT / "_shared" / "scripts" / "test_structure.py"
         if not t.is_file():
             log("  [跳过] 未找到结构校验脚本（可能已脱离仓库）")

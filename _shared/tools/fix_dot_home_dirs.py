@@ -37,6 +37,10 @@ from pathlib import Path
 REPO_ROOT = os.environ.get("PORTABLEAPPS_ROOT") or str(Path(__file__).resolve().parents[2])
 STAMP = date.today().strftime("%Y%m%d")
 
+# 产品根唯一解析处（dist 迁移到 D:\Portapps 后由它接管产品路径）。
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import _paths                                     # noqa: E402
+
 # 包 -> [(宿主路径模板, Data 内相对路径)]，宿主用 NSIS 变量写
 CONFIG = {
     "TraeCNPortable": [
@@ -193,14 +197,20 @@ def main() -> int:
     root = Path(REPO_ROOT)
     stats = {}
     for pkg in CONFIG:
-        for rel in (f"{pkg}/dist/{pkg}/App/AppInfo/Launcher/Custom.nsh",
-                    f"{pkg}/portableapps/App/AppInfo/Launcher/Custom.nsh"):
-            p = root / rel
+        # 产品树 Custom.nsh：迁移前 <Repo>/<Pkg>/dist/<Pkg>/...，
+        # 迁移后 <产品根>/<Pkg>/...（_paths 自动切换）
+        prod = _paths.product_dir(pkg) / "App" / "AppInfo" / "Launcher" / "Custom.nsh"
+        src = root / pkg / "portableapps" / "App" / "AppInfo" / "Launcher" / "Custom.nsh"
+        for p in (prod, src):
             if not p.exists():
                 stats["missing"] = stats.get("missing", 0) + 1
                 continue
             r = patch(pkg, p, apply)
             stats[r] = stats.get(r, 0) + 1
+            try:
+                rel = p.relative_to(root)
+            except ValueError:
+                rel = p                 # 产品根在仓库外
             print(f"  [{r}] {rel}")
     print("\n统计:", stats)
     if not apply:

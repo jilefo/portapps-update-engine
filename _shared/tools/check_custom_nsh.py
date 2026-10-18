@@ -2,11 +2,17 @@
 # >>> 路径自适应（开源迁移注入，勿删）：仓库根由本文件位置推导，
 #     不再写死绝对路径，可用 PORTABLEAPPS_ROOT 环境变量覆盖。
 import os as _os
+import sys as _sys
 from pathlib import Path as _Path
 
 REPO_ROOT = (_os.environ.get("PORTABLEAPPS_ROOT")
              or str(_Path(__file__).resolve().parents[2]))
 # <<< 路径自适应
+# >>> 产品根唯一解析处：Custom.nsh 是**产物**的一部分，dist 迁到
+#     D://Portapps 后它随产物离开仓库；只 glob 仓库内会扫到 0 个文件而假绿。
+_sys.path.insert(0, str(_Path(__file__).resolve().parents[1]))   # _shared/
+import _paths                                     # noqa: E402
+# <<<
 r"""check_custom_nsh.py —— Custom.nsh 的 PowerShell 病态扫描
 
 历史教训（勿再踩）：2026-10-17 之前，各包用 nsExec 内联
@@ -80,14 +86,27 @@ TREES = {
 
 
 def collect():
-    """返回 {包名: (树名, Path)}，同一包只留一个（dist 优先于 portableapps）。"""
+    """返回 {包名: (树名, Path)}，同一包只留一个。
+
+    优先级：**产品树**（_paths.product_dir，迁移后是 D:////Portapps////<Pkg>，
+    迁移前回退仓库内 dist/<Pkg>）→ portableapps 源树。
+    这样迁移前后扫到的是同一份文件，不会因为产物搬家就扫空集。
+    """
     found = {}
-    for tree in ("dist", "portableapps"):   # dist 先扫 → 优先
-        for g in TREES[tree]:
+    for pkg in _paths.packages():
+        base = _paths.product_dir(pkg)
+        for cand in (base / "App" / "AppInfo" / "Launcher" / "Custom.nsh",
+                     base / pkg / "App" / "AppInfo" / "Launcher"
+                     / "Custom.nsh"):
+            if cand.is_file():
+                found[pkg] = ("product", cand)
+                break
+    if not found:      # 克隆/CI：没有任何装配产物，退回源树（可能也没有）
+        for g in TREES["portableapps"]:
             for p in sorted(REPO.glob(g)):
                 pkg = p.relative_to(REPO).parts[0]
                 if pkg not in found:
-                    found[pkg] = (tree, p)
+                    found[pkg] = ("portableapps", p)
     return found
 
 
@@ -184,7 +203,8 @@ def main():
                   % (pkg, tree, st["ps_lines"], st["exec_lines"]))
 
     print("-" * 64)
-    print("扫描 %d 个 Custom.nsh（同包 dist 优先于 portableapps）；"
+    print("扫描 %d 个 Custom.nsh（产品树优先：迁移后 D:\\Portapps\\<Pkg>，"
+          "迁移前回退仓库内 dist/<Pkg>）；"
           "写 .ps1 行合计 %d，执行器行合计 %d" % (len(found), tot_ps, tot_exec))
     if tot_ps == 0 and tot_exec == 0:
         print("!! 未检查到任何 PowerShell 相关行 —— 过滤条件可能又对不上形态，"

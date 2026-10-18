@@ -5,7 +5,12 @@ import json
 import os
 import sys
 
-SRC = r"<旧工作区>/"
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import _paths
+
+# 项目根 = 仓库根。迁移前产品在 <SRC>/<name>/dist/<name>/，
+# 迁移后在 <产品根>/<name>/ —— 一律经 _paths.product_dir() 解析。
+SRC = str(_paths.REPO_ROOT)
 
 PROJECTS = [
     "AiPyProPortable", "BaiduNetdiskPortable", "CherryStudioPortable",
@@ -45,13 +50,17 @@ BASE_REQUIRED = [
     "portableapps/App/AppInfo/appicon_128.png",
     "portableapps/Other/Source",
     "portableapps/Other/Help",
-    "scripts/build-portable.ps1",
-    "tests",
+]
+# 2026-10-18 精简后，各包 scripts/ tests/ 上收到 _shared/scripts/，全仓库共用；
+# 原逐包项 scripts/build-portable.ps1、tests、scripts/package-paf.ps1 改为整体校验。
+CENTRAL = [
+    "_shared/scripts/build-portable.ps1",
+    "_shared/scripts/test_structure.py",
+    "_shared/scripts/package-paf.ps1",
 ]
 AUTO_REQUIRED = [
     ".github/workflows/release.yml",
     ".github/workflows/portableapps.yml",
-    "scripts/package-paf.ps1",
 ]
 # launcher.ini may live at App/AppInfo/launcher.ini or App/AppInfo/Launcher/<AppID>.ini
 LAUNCHER_ALT = "portableapps/App/AppInfo/Launcher/{}.ini"
@@ -101,8 +110,11 @@ def main():
                 missing.append("portableapps/App/<AppName>/")
         if not os.path.isdir(os.path.join(root, "src")):
             missing.append("src/")
-        if not os.path.isdir(os.path.join(root, "dist")):
-            missing.append("dist/")
+        # 产品目录：迁移前 <Repo>/<Pkg>/dist/<Pkg>，迁移后 <产品根>/<Pkg>。
+        # 判缺失时同时报出当前解析值，避免"看着有 dist 却报缺失"排查无门。
+        pdir = _paths.product_dir(name)
+        if not pdir.is_dir():
+            missing.append("产品目录(%s)" % pdir)
         size = dir_size(root)
         rows.append({
             "name": name, "exists": True, "missing": missing,
@@ -111,7 +123,10 @@ def main():
 
     out = {"root": SRC, "projects": rows,
            "total": len(rows),
-           "missing_dirs": [r["name"] for r in rows if not r["exists"]]}
+           "missing_dirs": [r["name"] for r in rows if not r["exists"]],
+           "central_toolchain_missing": [
+               rel for rel in CENTRAL
+               if not os.path.exists(os.path.join(SRC, rel.replace("/", os.sep)))]}
     print(json.dumps(out, ensure_ascii=False, indent=1))
 
 

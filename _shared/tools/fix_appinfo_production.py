@@ -15,7 +15,7 @@ r"""fix_appinfo_production.py —— appinfo.ini 生产级缺陷修复
 1. ExtractIcon 路径指向不存在的 exe（3 个包）
    后果：构建启动器时取不到图标 -> 启动器 exe 落到默认图标（用户视角
    「图标不对」的一类真因）。
-   修复：按 dist 树里真实存在的 exe 改写。
+   修复：按产品树里真实存在的 exe 改写。
      CodeArtsPortable        App\CodeArtsPortable\CodeArtsPortable.exe
                           -> App\CodeArts\CodeArts.exe
      FoxitPDFPortable        App\FoxitPDFPortable\FoxitPDFPortable.exe
@@ -23,7 +23,7 @@ r"""fix_appinfo_production.py —— appinfo.ini 生产级缺陷修复
      QuarkCloudDrivePortable App\QuarkCloudDrivePortable\...
                           -> App\QuarkCloudDrive\quark_cloud_drive.exe
 
-2. dist（可运行树）appinfo.ini 缺 [Format] / [Control]（21+1 个包）
+2. 产品树（可运行树）appinfo.ini 缺 [Format] / [Control]（21+1 个包）
    后果：PortableApps 平台读不到 Start/ExtractIcon/Icons，dist 作为交付
    物在平台菜单里信息不全。
    修复：**文本级合并**——保留 dist 原有段与注释，只从 portableapps 源树
@@ -34,12 +34,17 @@ r"""fix_appinfo_production.py —— appinfo.ini 生产级缺陷修复
 import configparser
 import os
 import shutil
+import sys
 from datetime import datetime
+
+# 产品根唯一解析处（dist 迁移到 D:\Portapps 后由它接管产品路径）。
+sys.path.insert(0, str(_Path(__file__).resolve().parents[1]))
+import _paths                                     # noqa: E402
 
 ROOT = REPO_ROOT
 STAMP = datetime.now().strftime("%Y%m%d-%H%M%S")
 
-# 手工核定的正确路径（已用 os.path.isfile 在 dist 树验证）
+# 手工核定的正确路径（已用 os.path.isfile 在产品树验证）
 ICON_FIX = {
     "CodeArtsPortable": r"App\CodeArts\CodeArts.exe",
     "FoxitPDFPortable": r"App\Foxit PDF Editor\FoxitPDFEditor.exe",
@@ -58,10 +63,11 @@ def pkgs():
 
 
 def paths(name, base):
+    # "dist" 即产品树：迁移前 <Repo>/<Pkg>/dist/<Pkg>，迁移后 <产品根>/<Pkg>
     return {
         "portableapps": os.path.join(base, "portableapps", "App", "AppInfo",
                                      "appinfo.ini"),
-        "dist": os.path.join(base, "dist", name, "App", "AppInfo",
+        "dist": os.path.join(str(_paths.product_dir(name)), "App", "AppInfo",
                              "appinfo.ini"),
     }
 
@@ -95,8 +101,8 @@ def fix_icons():
         if name not in ICON_FIX:
             continue
         want = ICON_FIX[name]
-        # 先确认目标真实存在
-        tgt = os.path.join(base, "dist", name, *want.split("\\"))
+        # 先确认目标真实存在（产品树里）
+        tgt = os.path.join(str(_paths.product_dir(name)), *want.split("\\"))
         if not os.path.isfile(tgt):
             print("  !! 目标仍不存在，跳过:", name, tgt)
             continue
@@ -168,5 +174,5 @@ def fix_sections():
 if __name__ == "__main__":
     print("=== 1. ExtractIcon 路径修复 ===")
     fix_icons()
-    print("\n=== 2. dist appinfo 补 [Format]/[Control] ===")
+    print("\n=== 2. 产品树 appinfo 补 [Format]/[Control] ===")
     fix_sections()

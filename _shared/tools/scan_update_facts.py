@@ -18,6 +18,8 @@ import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import _paths                                     # noqa: E402
 CONFIG_DIR = REPO_ROOT / "_shared" / "configs"
 OUT = REPO_ROOT / "_shared" / "update" / "_facts.json"
 
@@ -39,13 +41,15 @@ def ini_field(text: str, key: str):
 
 
 def pkg_dirs():
-    return sorted(p for p in REPO_ROOT.iterdir()
-                  if p.is_dir() and (p / "dist").is_dir()
-                  and p.name.endswith("Portable"))
+    """真正的包：走 _paths.packages()（迁移后仓库里仍有 portableapps/ 源树，
+    产物在仓库外的产品根，老条件 `(p/'dist').is_dir()` 会漏包）。"""
+    return sorted(REPO_ROOT / n for n in _paths.packages()
+                  if n.endswith("Portable"))
 
 
 def dist_of(pkgdir: Path):
-    d = pkgdir / "dist" / pkgdir.name
+    """产品目录：迁移后 <产品根>/<Pkg>，迁移前 <Repo>/<Pkg>/dist/<Pkg>。"""
+    d = _paths.product_dir(pkgdir.name)
     return d if d.is_dir() else None
 
 
@@ -53,9 +57,11 @@ def collect(pkgdir: Path):
     name = pkgdir.name
     info = dict(pkg=name)
     d = dist_of(pkgdir)
-    info["dist"] = str(d.relative_to(REPO_ROOT)) if d else None
+    # 产品目录可能在仓库外，relative_to 会抛 ValueError，直接存绝对路径
+    info["dist"] = str(d) if d else None
+    info["product_tree"] = _paths.product_tree_in_use(name)
     if not d:
-        info["error"] = "无 dist/<Pkg> 目录"
+        info["error"] = "无产品目录（产品根=%s）" % _paths.product_root()
         return info
 
     # --- appinfo ---

@@ -8,7 +8,7 @@ audit_launch_health.py —— 便携包「启动/数据/卡顿」健康度静态
   C. 卡顿        —— Custom.nsh 里 PowerShell / nsExec 调用次数（每次 1~2s）
 
 用法：
-  python audit_launch_health.py                 # 审计 dist 树（默认）
+  python audit_launch_health.py                 # 审计产品树（默认）
   python audit_launch_health.py --tree source   # 审计 portableapps 源树
   python audit_launch_health.py --json out.json # 导出 JSON
 
@@ -23,12 +23,18 @@ import re
 import sys
 from pathlib import Path
 
+# 产品根唯一解析处（dist 迁移到 D:\Portapps 后由它接管路径）。
+# 不放 try/except：_paths.py 缺失本身就是必须立刻发现的故障。
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import _paths                                     # noqa: E402
+
+
 # ── 仓库根推导（与既有脚本一致）──────────────────────────────────────────
 def repo_root() -> Path:
     env = os.environ.get("PORTABLEAPPS_ROOT")
     if env:
         return Path(env).resolve()
-    return Path(__file__).resolve().parents[2]
+    return _paths.REPO_ROOT
 
 
 MARK_SELFHEAL = "Custom.nsh_Init"
@@ -258,7 +264,14 @@ def main() -> int:
     root = repo_root()
     trees = []
     if args.tree in ("dist", "both"):
-        trees.append(("dist", [p / "dist" / p.name for p in sorted(root.iterdir()) if (p / "dist" / p.name).is_dir()]))
+        # 产品树统一走 _paths.product_dir()：迁移后自动读 D:\Portapps\<Pkg>，
+        # 未迁移时自动回退仓库内 dist/<Pkg>，两个状态行为一致。
+        dist_dirs = []
+        for pkg in _paths.packages():
+            d = _paths.product_dir(pkg)
+            if d.is_dir() and (d / "App").is_dir():
+                dist_dirs.append(d)
+        trees.append(("dist", dist_dirs))
     if args.tree in ("source", "both"):
         trees.append(("source", [p / "portableapps" for p in sorted(root.iterdir()) if (p / "portableapps" / "App").is_dir()]))
 
@@ -266,15 +279,20 @@ def main() -> int:
     results = []
     for tname, dirs in trees:
         for d in dirs:
-            if only and d.name not in only:
+            # source 树的目录名统一是 portableapps，过滤要用父目录的真实包名
+            nm = d.parent.name if tname == "source" else d.name
+            if only and nm not in only:
                 continue
-            r = audit_pkg(d, tname)
+            r = audit_pkg(d, tname, nm)
             r["tree"] = tname
             results.append(r)
 
-    # 汇总
+    # 汇总（自报覆盖度：读了哪个产品根、审了几个包，不悄悄报 OK）
     n_err = sum(len(r["error"]) for r in results)
     n_warn = sum(len(r["warn"]) for r in results)
+    if any(t == "dist" for t, _ in trees):
+        print("产品根: %s（来源：%s）" % (_paths.product_root(),
+                                        _paths.product_root_source()))
     print(f"审计 {len(results)} 个包 —— ERROR {n_err} 条 / WARN {n_warn} 条\n")
 
     bad = [r for r in results if r["error"]]

@@ -1,8 +1,10 @@
 # -*- coding: utf-8 -*-
 r"""gen_update_strategies.py —— 生成「一包一更新脚本」
 
-产出位置：**dist/<Pkg>/update.py**（每个便携包目录下各自一个，自包含，
-把 dist/<Pkg>/ 整个拷走也能单独运行）。
+产出位置：**<产品目录>/update.py**（每个便携包目录下各自一个，自包含，
+把整个产品目录拷走也能单独运行）。产品目录迁移前是 dist/<Pkg>/，
+2026-10-18 起是 <产品根>/<Pkg>/（默认 D:\\Portapps\\<Pkg>），
+由 _paths.product_dir() 统一解析。
 
 模板：  _shared/tools/update_template.py（引擎内联，不 import _shared）
 事实：  _shared/update/_facts.json（由 scan_update_facts.py 扫描产出，
@@ -24,6 +26,9 @@ import json
 import re
 import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import _paths                                     # noqa: E402
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 TEMPLATE = Path(__file__).resolve().parent / "update_template.py"
@@ -168,7 +173,7 @@ def one_line(s):
 # ---------------------------------------------------------- 从磁盘反推痕迹
 def engine_traces(pkg, app_subdir):
     """返回现在被禁用的更新器文件名列表（去掉 .disabled-by-engine 后缀）。"""
-    root = REPO_ROOT / pkg / "dist" / pkg / "App" / app_subdir
+    root = _paths.product_dir(pkg) / "App" / app_subdir
     if not root.is_dir():
         return []
     out = []
@@ -313,10 +318,13 @@ def main():
 
     if "--clean" in argv:
         n = 0
-        for f in REPO_ROOT.glob("*/dist/*/update.py"):
-            f.unlink()
-            n += 1
-        print("已删除旧的 update.py：%d 个" % n)
+        for pkg in _paths.packages():
+            f = _paths.product_dir(pkg) / "update.py"
+            if f.is_file():
+                f.unlink()
+                n += 1
+        print("已删除旧的 update.py：%d 个（产品根=%s）"
+              % (n, _paths.product_root()))
 
     n_auto = 0
     n_disable = 0
@@ -336,14 +344,15 @@ def main():
         if disable:
             n_disable += 1
         text = render(pkg, spec, fact, disable)
-        out = REPO_ROOT / pkg / "dist" / pkg / "update.py"
+        out = _paths.product_dir(pkg) / "update.py"
         if not out.parent.is_dir():
-            print("[跳过] 目录不存在：%s" % out)
+            print("[跳过] 产品目录不存在：%s" % out)
             continue
         out.write_text(text, encoding="utf-8")
         if spec["kind"] != M:
             n_auto += 1
-    print("已生成 %d 个更新脚本 -> dist/<Pkg>/update.py" % len(by_pkg))
+    print("已生成 %d 个更新脚本 -> <产品目录>/update.py（产品根=%s）"
+          % (len(by_pkg), _paths.product_root()))
     print("  在线自动源 %d / 人工接管 %d / 带自带更新器禁用逻辑 %d"
           % (n_auto, len(by_pkg) - n_auto, n_disable))
     return 0

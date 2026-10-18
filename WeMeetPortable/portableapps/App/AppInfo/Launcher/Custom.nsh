@@ -20,7 +20,7 @@
 ;     (0x400)，区分"残留联接"与"宿主真实目录"；真实目录先 robocopy
 ;     合并回 Data 再移除，绝不丢数据。
 ;   - 删联接只用 rmdir（不带 /s），防止删穿 junction 误删 Data 数据。
-;   - 绝不联接共享/他软件目录（Marvis 属 <本机工具目录>/Marvis 独立套件；
+;   - 绝不联接共享/他软件目录（Marvis 属 D:\DevTools\Marvis 独立套件；
 ;     beacon/BeaconConfig/DtConfig 为腾讯系共享埋点缓存）。
 ;
 ; [踩坑清单，勿重复]
@@ -171,7 +171,7 @@ Var WMLog
   ; 3) 记录卸载兜底清理清单（FilesMove 正常退出后宿主本无残留，
   ;    此清单用于异常退出后的手动/卸载时兜底，见 _卸载.bat）
   ;    注意：绝不列入 %APPDATA%\Tencent\Marvis —— 它属于宿主独立
-  ;    安装的 Marvis 套件（<本机工具目录>/Marvis），清理会误伤他软件。
+  ;    安装的 Marvis 套件（D:\DevTools\Marvis），清理会误伤他软件。
   FileOpen $WMLog "$DataDirectory\settings\leak_paths.txt" w
   ${If} $WMLog != ""
     FileWrite $WMLog "%APPDATA%\Tencent\WeMeet`r`n"

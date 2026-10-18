@@ -17,7 +17,11 @@ scan_redirect_coverage.py —— 「数据保存不对」机理分级（只读�
 from __future__ import annotations
 
 import re
+import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))  # 定位 _paths
+import _paths                                   # noqa: E402
 
 RE_JUNCTION = re.compile(r"(?i)junction|mklink|SymbolicLink|CreateHardLink")
 RE_PSHELL = re.compile(r"(?i)powersh""ell|pwsh")
@@ -31,11 +35,15 @@ def read_text(p: Path) -> str:
 
 
 def main() -> int:
-    root = Path(__file__).resolve().parents[2]
     rows = []
-    for nsh in sorted(root.glob("*/dist/*/App/AppInfo/Launcher/Custom.nsh")):
-        # <Pkg>/dist/<Pkg>/App/AppInfo/Launcher/Custom.nsh
-        pkg = nsh.parents[5].name
+    # 产物树 Custom.nsh：迁移前 <Repo>/<Pkg>/dist/<Pkg>/...，
+    # 迁移后 <产品根>/<Pkg>/... —— 经 _paths.custom_nsh_files() 枚举
+    # （老 glob "*/dist/*/..." 迁移后扫 0 个文件会假绿）。
+    nsh_pairs = _paths.custom_nsh_files()
+    print("产物根: %s（来源 %s）| 产品树 Custom.nsh %d 个"
+          % (_paths.product_root(), _paths.product_root_source(),
+             len(nsh_pairs)))
+    for pkg, nsh in sorted(nsh_pairs):
         txt = read_text(nsh)
         j = len(RE_JUNCTION.findall(txt))
         ps = len(RE_PSHELL.findall(txt))

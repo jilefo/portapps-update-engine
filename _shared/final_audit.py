@@ -14,7 +14,10 @@ from pathlib import Path
 
 sys.stdout.reconfigure(encoding="utf-8")
 
-ROOT = Path(r"<仓库根>/")
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import _paths
+
+ROOT = _paths.REPO_ROOT
 
 PROJECTS = [
     "AiPyProPortable", "BaiduNetdiskPortable", "CherryStudioPortable",
@@ -45,9 +48,8 @@ GITHUB_TRACK = [
     "LICENSE", "README.md", "CONTRIBUTING.md", "CODE_OF_CONDUCT.md",
     "SECURITY.md", "CHANGELOG.md", "SUPPORT.md", "THIRD_PARTY_NOTICES.md",
     "docs/PORTABLE.md", "docs/BUILD.md", "docs/RELEASE.md",
-    "scripts/build-portable.py", "scripts/build-portable.ps1",
-    "scripts/toolchain.py", "scripts/gen-sbom.py",
-    "tests/test_structure.py", "src",
+    "WORKFLOW.md",
+    "src",
     "portableapps/help.html",
     "portableapps/App/AppInfo/appinfo.ini",
     "portableapps/App/AppInfo/installer.ini",
@@ -56,21 +58,32 @@ GITHUB_TRACK = [
     "portableapps/App/AppInfo/appicon_32.png",
     "portableapps/App/AppInfo/appicon_128.png",
     "portableapps/Other/Source", "portableapps/Other/Help",
-    "WORKFLOW.md",
+]
+
+# 集中工具链（2026-10-18 精简后由各包 scripts/ tests/ 上收到 _shared/scripts/，
+# 全仓库 39 包共用一份；缺失对所有项目同时失效，故单独整体校验一次）
+CENTRAL_TOOLCHAIN = [
+    "_shared/scripts/build-portable.py",
+    "_shared/scripts/build-portable.ps1",
+    "_shared/scripts/toolchain.py",
+    "_shared/scripts/gen-sbom.py",
+    "_shared/scripts/test_structure.py",
+    # 非特例项目（36/39）的打包链；集中存在不违反三特例禁令
+    # （禁令约束的是包内 .github/workflows/release.yml 与包内 scripts/）。
+    "_shared/scripts/package-paf.py",
+    "_shared/scripts/package-paf.ps1",
 ]
 
 # 轨道二：仅非特例项目需要
 RELEASE_TRACK = [
     ".github/workflows/release.yml",
     ".github/workflows/portableapps.yml",
-    "scripts/package-paf.py", "scripts/package-paf.ps1",
 ]
 
 # 三特例必须**不存在**这些文件
 MUST_NOT_HAVE = [
     ".github/workflows/release.yml",
     ".github/workflows/portableapps.yml",
-    "scripts/package-paf.ps1",
 ]
 
 CATEGORIES = {"Accessibility", "Development", "Education", "Games",
@@ -161,7 +174,8 @@ def _locate_executable(root: Path, pkg: str, pe: str) -> tuple[bool, str]:
 
       A. 内嵌式：portableapps\\App\\<App>\\<exe>   —— 小体量软件，源码随源入库
       B. 占位式：portableapps\\App\\<App>\\DOWNLOAD.txt 仅占位说明，
-                 大二进制在 dist\\<Pkg>\\App\\<App>\\ 下，构建时注入
+                 大二进制在产品目录（迁移前 <Repo>/<Pkg>/dist/<Pkg>，
+                 迁移后 <产品根>/<Pkg>）的 App\\<App>\\ 下，构建时注入
 
     返回 (是否找到, 布局标记)
     """
@@ -169,8 +183,10 @@ def _locate_executable(root: Path, pkg: str, pe: str) -> tuple[bool, str]:
     in_src = root / "portableapps" / "App" / rel
     if in_src.is_file():
         return True, "内嵌"
-    in_dist = root / "dist" / pkg / "App" / rel
-    if in_dist.is_file():
+    # 迁移前产品树 = <Repo>/<Pkg>/dist/<Pkg>，迁移后 = <产品根>/<Pkg>，
+    # 由 _paths.product_dir() 按两种布局自动切换。
+    in_prod = _paths.product_dir(pkg) / "App" / rel
+    if in_prod.is_file():
         return True, "占位"
     return False, "缺失"
 
@@ -224,9 +240,10 @@ def audit_project(pkg: str) -> tuple[list[str], dict]:
             if (root / rel.replace("/", os.sep)).exists():
                 errs.append(f"特例项目不应存在 {rel}")
 
-    # dist 目录
-    if not (root / "dist").is_dir():
-        errs.append("缺 dist/ 目录")
+    # 产品目录（迁移前 <Repo>/<Pkg>/dist/<Pkg>，迁移后 <产品根>/<Pkg>）
+    pdir = _paths.product_dir(pkg)
+    if not pdir.is_dir():
+        errs.append("缺产品目录: %s" % pdir)
 
     # appinfo 内容
     ai = root / "portableapps" / "App" / "AppInfo" / "appinfo.ini"
@@ -248,8 +265,8 @@ def audit_project(pkg: str) -> tuple[list[str], dict]:
     else:
         info["payload"] = subs
 
-    # 工具链可达性：toolchain.py 应能解析到 _shared
-    tc = root / "scripts" / "toolchain.py"
+    # 工具链可达性：集中 toolchain shim（精简后各包 scripts/ 已上收 _shared/）
+    tc = ROOT / "_shared" / "scripts" / "toolchain.py"
     if tc.is_file():
         info["toolchain_shim"] = True
 
@@ -269,6 +286,18 @@ def main() -> int:
         errs, info = audit_project(pkg)
         total_err += len(errs)
         rows.append((pkg, errs, info))
+
+    # 集中工具链整体校验（39 包共用；缺失对所有项目同时生效，故单独报一次）
+    missing_central = [rel for rel in CENTRAL_TOOLCHAIN
+                       if not (ROOT / rel).is_file()]
+    if missing_central:
+        total_err += len(missing_central)
+        print("[集中工具链] 缺：")
+        for rel in missing_central:
+            print(f"      - {rel}")
+    else:
+        print("[集中工具链] _shared/scripts 下 %d 个必需脚本齐全"
+              % len(CENTRAL_TOOLCHAIN))
 
     print(f"{'项目':24s} {'结果':6s} 说明")
     print("-" * 78)

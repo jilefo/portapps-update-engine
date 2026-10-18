@@ -1,9 +1,9 @@
 ﻿# -*- coding: utf-8 -*-
-"""gen_update_configs.py —— 从各便携包现有结构生成 Configs\\<项目>.yaml
+r"""gen_update_configs.py —— 从各便携包现有结构生成 _shared\\configs\\<项目>.yaml
 
-数据源（只读）：
-  - Work\\<包>\\App\\AppInfo\\appinfo.ini   → current_version / publisher
-  - Work\\<包>\\App\\AppInfo\\Launcher\\*.ini → entry_exe / app_subdir
+数据源（只读，按三种历史布局探测）：
+  - <Repo>\<包>\portableapps\App\AppInfo\appinfo.ini   → current_version / publisher
+  - <Repo>\<包>\portableapps\App\AppInfo\Launcher\*.ini → entry_exe / app_subdir
 
 分类与策略（方案第 11 节维护节奏分级 + 落地决策）：
   - P0 周检：Cursor / Qoder 系 / CodeArts 系 / CodeBuddy / Comate / JoyCode /
@@ -18,9 +18,13 @@ manual + needs_manual，不虚构 URL，人工下载后 ingest 接管。
 from __future__ import annotations
 
 import configparser
+import sys
 from pathlib import Path
 
 import yaml
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # 定位 _paths
+import _paths                                   # noqa: E402
 
 ROOT = Path(__file__).resolve().parent      # ...\PortableApps\_shared
 WORK = ROOT.parent                          # ...\PortableApps（各项目父目录）
@@ -164,11 +168,20 @@ def _read_ini_file(path: Path) -> configparser.ConfigParser:
     return cp
 
 
-def read_entry_exe(pkg: Path) -> str:
+def read_entry_exe(pkg: Path, prefer: str | None = None) -> str:
     lad = pkg / "App" / "AppInfo" / "Launcher"
     if not lad.is_dir():
         return ""
-    for f in sorted(lad.glob("*.ini")):
+    cands = sorted(lad.glob("*.ini"))
+    # 同名 ini 优先（PAL 约定：N 个 exe 就要 N 个同名 <BaseName>.ini）。
+    # WPSOfficePortable 等多启动器特例有 5 份 ini，字典序第一个是
+    # PresentationPortable（wpp.exe）而非默认入口；取 <包名>.ini 才与
+    # appinfo [Control] Start 指向一致。
+    if prefer:
+        first = lad / f"{prefer}.ini"
+        if first.is_file():
+            cands = [first] + [c for c in cands if c != first]
+    for f in cands:
         cp = _read_ini_file(f)
         if cp.has_section("Launch"):
             return cp.get("Launch", "ProgramExecutable", fallback="")
@@ -180,7 +193,7 @@ def build_config(pkg: Path, name: str | None = None,
     name = name or pkg.name
     dir_value = dir_value or name
     info = read_appinfo(pkg)
-    entry_exe = read_entry_exe(pkg)
+    entry_exe = read_entry_exe(pkg, prefer=name)
     app_subdir = entry_exe.replace("\\", "/").split("/")[0] if entry_exe \
         else ""
     version = info.get("version") or info.get("package_version") or "0.0.0"
@@ -232,30 +245,30 @@ def build_config(pkg: Path, name: str | None = None,
 
 def main() -> int:
     CONFIGS.mkdir(parents=True, exist_ok=True)
-    #迁移后统一为双轨布局：<Project>\portableapps\App\AppInfo\appinfo.ini
-    # 兼容三种历史布局：
+    # 2026-10-18 迁移后产品统一在仓库外 <产品根>\<Pkg>\，yaml 的 dir 字段
+    # 只写包名（旧写法 <Pkg>\dist\<Pkg> 仍被 update_engine.pkg_dir /
+    # disable_updater 按"取最后一段"兼容解析，见 _paths.product_dir）。
+    # 源结构按三种布局探测 appinfo（取当前版本/入口），dir 一律归一为包名：
     #   双轨：<Project>\portableapps\App\AppInfo\appinfo.ini   （标准）
     #   平铺：<Project>\App\AppInfo\appinfo.ini              （老 22 包）
-    #   产物：<Project>\dist\<Pkg>\App\AppInfo\appinfo.ini    （已构建产物）
+    #   产品：迁移前 <Project>\dist\<Pkg>\...，迁移后 <产品根>\<Pkg>\...
+    #        —— 经 _paths.product_dir() 两种布局自动切换
     found: list[tuple[Path, str, str]] = []  # (包根, 包名, dir 值)
     for repo in sorted(WORK.iterdir()):
         if not repo.is_dir() or repo.name in EXCLUDED or repo.name.startswith("_"):
             continue
         paf = repo / "portableapps" / "App" / "AppInfo" / "appinfo.ini"
         if paf.is_file():
-            found.append((paf.parent.parent.parent, repo.name,
-                          f"{repo.name}\\dist\\{repo.name}"))
+            found.append((paf.parent.parent.parent, repo.name, repo.name))
             continue
         flat = repo / "App" / "AppInfo" / "appinfo.ini"
         if flat.is_file():
             found.append((repo, repo.name, repo.name))
             continue
-        dist = repo / "dist"
-        if dist.is_dir():
-            for d in sorted(dist.iterdir()):
-                if (d / "App" / "AppInfo" / "appinfo.ini").is_file():
-                    found.append((d, repo.name,
-                                  f"{repo.name}\\dist\\{d.name}"))
+        prod = _paths.product_dir(repo.name)
+        pai = prod / "App" / "AppInfo" / "appinfo.ini"
+        if pai.is_file():
+            found.append((prod, repo.name, repo.name))
     written = []
     for pkg, name, dir_value in found:
         cfg = build_config(pkg, name, dir_value)

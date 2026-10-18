@@ -23,9 +23,10 @@ from pathlib import Path
 
 import yaml
 
-ROOT = Path(__file__).resolve().parents[1]
-WORK = ROOT / "Work"
-CONFIGS = ROOT / "Configs"
+ROOT = Path(__file__).resolve().parents[0]   # ...\PortableApps\_shared
+sys.path.insert(0, str(ROOT))                # 定位 _paths（路径唯一解析处）
+import _paths                                # noqa: E402
+CONFIGS = ROOT / "configs"
 EVIDENCE = ROOT / "evidence"
 
 log = logging.getLogger("disable_updater")
@@ -148,13 +149,16 @@ def main() -> int:
                     help="跳过组件物理处置")
     ap.add_argument("--no-argv", action="store_true",
                     help="跳过 argv.json 处置")
-    ap.add_argument("--dir", help="覆盖目标 App 目录（默认 Work\\<dir>\\App；"
+    ap.add_argument("--dir", help="覆盖目标 App 目录（默认 <产品目录>\\App；"
                                   "用于处置 Staging 中的候选版本）")
     args = ap.parse_args()
 
     cfg = yaml.safe_load(
         (CONFIGS / f"{args.project}.yaml").read_text(encoding="utf-8-sig"))
-    pkg = WORK / cfg["dir"]
+    # dir 旧写作 <Pkg>\dist\<Pkg>；迁移后产品在 <产品根>\<Pkg>。
+    # 取最后一段包名经 _paths.product_dir() 解析，两种布局全兼容。
+    rel = str(cfg["dir"]).replace("/", "\\").strip("\\")
+    pkg = _paths.product_dir(rel.rsplit("\\", 1)[-1])
     app_dir = Path(args.dir) if args.dir else pkg / "App"
     run_id = datetime.now().strftime("%Y%m%d-%H%M%S")
     ev = EVIDENCE / args.project / run_id / "update-disable-updater"

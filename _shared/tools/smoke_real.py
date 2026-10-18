@@ -11,9 +11,27 @@ _TOOLS_DIR_F = str(_Path(__file__).resolve().parent).replace("\\", "/")
 """smoke_real.py —— 真启动冒烟（参数化）。
 判定：应用进程出现(按名) + Data 目录新写入 + 捕获中止框文本(应为空)。
 用法：python smoke_real.py <PkgName> [观察秒数]
+
+产品目录由 _paths.product_dir() 解析：迁移后 <产品根>/<Pkg>，
+迁移前 <Repo>/<Pkg>/dist/<Pkg>，无需改配置自动切换。
 """
 import ctypes, glob, os, subprocess, sys, time
+from pathlib import Path
 import psutil
+
+# >>> 路径自适应（开源迁移注入，勿删）：仓库根由本文件位置推导，
+#     不再写死绝对路径，可用 PORTABLEAPPS_ROOT 环境变量覆盖。
+import os as _os
+from pathlib import Path as _Path
+REPO_ROOT = (_os.environ.get("PORTABLEAPPS_ROOT")
+             or str(_Path(__file__).resolve().parents[2]))
+REPO_ROOT_F = REPO_ROOT.replace("\\", "/")
+_TOOLS_DIR_F = str(_Path(__file__).resolve().parent).replace("\\", "/")
+# <<< 路径自适应
+
+# 产品根唯一解析处（dist 迁移到 D:\Portapps 后由它接管产品路径）。
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import _paths                                     # noqa: E402
 
 BASE_ROOT = REPO_ROOT_F
 STRIP_ENV = ("ELECTRON_RUN_AS_NODE", "NODE_OPTIONS", "NODE_EXTRA_CA_CERTS")
@@ -109,7 +127,13 @@ def dialogs_for(launcher_pid):
 
 
 def run(pkg):
-    base = os.path.join(BASE_ROOT, pkg, "dist", pkg)
+    base = str(_paths.product_dir(pkg))
+    if not os.path.isdir(base):
+        print(f"[{pkg}] [FAIL] 产品目录不存在: {base}"
+              f"（产品根={_paths.product_root()}，"
+              f"来源：{_paths.product_root_source()}）")
+        return
+    print(f"[{pkg}] 产品目录: {base}")
     targets = targets_of(pkg)
     pre_clean_rt(base)
     for n in targets:

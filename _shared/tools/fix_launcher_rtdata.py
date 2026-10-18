@@ -44,6 +44,10 @@ from pathlib import Path
 REPO_ROOT = (os.environ.get("PORTABLEAPPS_ROOT")
              or str(Path(__file__).resolve().parents[2]))
 
+# 产品根唯一解析处（dist 迁移到 D:\Portapps 后由它接管产品路径）。
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import _paths                                     # noqa: E402
+
 MARK = "Custom.nsh_Init"
 
 # 自愈钩子与精简 helpers（不依赖 LogicLib，纯 StrCmp，任何包都能插）
@@ -99,16 +103,22 @@ SNIPPET = r"""
 
 
 def candidates(root: str):
-    """返回 (包名, 树别, Custom.nsh 路径)"""
+    """返回 (包名, 树别, Custom.nsh 路径)
+
+    源树固定 portableapps/（在仓库内）；产品树走 _paths.product_dir()：
+    迁移前 <Repo>/<Pkg>/dist/<Pkg>，迁移后 <产品根>/<Pkg>，自动切换。
+    """
     rootp = Path(root)
     for pkg in sorted(p for p in rootp.iterdir() if p.is_dir()):
         if pkg.name.startswith("_") or pkg.name in ("docs", ".github"):
             continue
-        for tree, rel in (("portableapps", "portableapps/App/AppInfo/Launcher/Custom.nsh"),
-                          ("dist", "dist/%s/App/AppInfo/Launcher/Custom.nsh" % pkg.name)):
-            f = pkg / rel
-            if f.is_file():
-                yield pkg.name, tree, f
+        src = pkg / "portableapps" / "App" / "AppInfo" / "Launcher" / "Custom.nsh"
+        if src.is_file():
+            yield pkg.name, "portableapps", src
+        prod = (_paths.product_dir(pkg.name) / "App" / "AppInfo" / "Launcher"
+                / "Custom.nsh")
+        if prod.is_file():
+            yield pkg.name, "dist", prod
 
 
 def insert_once(text: str) -> str:
@@ -133,6 +143,10 @@ def main():
         todo.append((pkg, tree, f, new))
 
     print("仓库根: %s" % REPO_ROOT)
+    print("产品根: %s（来源：%s）"
+          % (_paths.product_root(), _paths.product_root_source()))
+    print("扫描 Custom.nsh: %d 个（源树 + 产品树）"
+          % (len(todo) + len(skip) + len(nohook)))
     print("待修复: %d    已修复过: %d    无 Custom.nsh_ 钩子: %d"
           % (len(todo), len(skip), len(nohook)))
     if nohook[:5]:

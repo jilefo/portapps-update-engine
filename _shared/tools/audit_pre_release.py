@@ -33,6 +33,10 @@ REPO_ROOT = os.environ.get("PORTABLEAPPS_ROOT") or str(
 # <<<
 REPO = Path(REPO_ROOT)
 
+# 产品根唯一解析处（dist 迁移到 D:\Portapps 后由它接管产品路径）
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+import _paths                                     # noqa: E402
+
 ROOT_META = [
     "LICENSE", "README.md", "SECURITY.md", "CONTRIBUTING.md",
     "CODE_OF_CONDUCT.md", "CHANGELOG.md", ".gitignore", ".gitattributes",
@@ -162,15 +166,19 @@ def audit_packages(fails, warns, notes):
                 fails.append("[B] %s 缺 %s" % (n, f))
         if not (pkg / ".github" / "workflows" / "ci.yml").is_file():
             warns.append("[B] %s 缺 .github/workflows/ci.yml" % n)
-        for tree in ("portableapps", "dist"):
-            for sub in (("App", "AppInfo"), (n, "App", "AppInfo")):
-                if (pkg / tree / Path(*sub) / "appinfo.ini").is_file():
-                    break
-            else:
-                if tree == "portableapps":
-                    fails.append("[B] %s 两处都没有 appinfo.ini" % n)
-                else:
-                    notes.append("%s dist 未装配（仅含 update.py 等，本地/CI 预期内）" % n)
+        # 两棵树都要有 appinfo.ini：
+        #   源树 portableapps/（在仓库里）；产品树 = _paths.product_dir(n)
+        #   （迁移前 <Pkg>/dist/<Pkg>，迁移后 <产品根>/<Pkg>，自动切换）
+        subs = (("App", "AppInfo"), (n, "App", "AppInfo"))
+        found_src = any((pkg / "portableapps" / Path(*s) / "appinfo.ini").is_file()
+                        for s in subs)
+        prod = _paths.product_dir(n)
+        found_prod = any((prod / Path(*s) / "appinfo.ini").is_file()
+                         for s in subs)
+        if not found_src:
+            fails.append("[B] %s 源树没有 appinfo.ini" % n)
+        if not found_prod:
+            notes.append("%s 产品树未装配（仅含 update.py 等，本地/CI 预期内）" % n)
         # THIRD_PARTY_NOTICES 应真的列出了第三方
         tpn = pkg / "THIRD_PARTY_NOTICES.md"
         if tpn.is_file():
@@ -277,20 +285,53 @@ def audit_dist_impact(fails, warns, notes):
                  % (len(tracked), sorted({Path(f).name for f in tracked})))
     if not tracked:
         fails.append("[E] dist 下没有任何被跟踪文件——迁移会无损失")
-    # 工具链里对 dist 路径的假设
-    hard = []
+    # 工具链里对 dist 路径的假设。判定分两档，避免"改造了一半"被漏报、
+    # 也避免"注释里提了 dist"被误报：
+    #   hard   未 import _paths 且仍引用 dist  —— 完全没适配，迁移后必错
+    #   partial 已 import _paths 但仍引用 dist —— 多半是回退分支/文档字符串，
+    #           留待人工确认（audit_repo 的 legacy 回退属预期）
+    # EXEMPT：
+    #   _paths.py            适配机制本身
+    #   restructure_kuku.py  已执行完的一次性历史脚本（留档备查）
+    #   gen_report.py        同上，历史报告生成器
+    #   fix_package_gitignore.py 模板文本含 dist 字样，但枚举条件已改为
+    #                        portableapps/（源树），与 dist 存在与否无关
+    #   update_template.py   模板文本合法讨论两种布局（迁移前后各一份）；
+    #                        由它生成的 update.py 已内联探测逻辑，随产物
+    #                        在 <产品根>\<Pkg>\ 运行，不经仓库内 dist
+    #   scaffold.py          2026-10-17 遗留生成器：已加运行护栏（默认拒绝，
+    #                         --legacy-layout 显式放行），模板文本含旧 dist
+    #                         路径属留档；不会再被无意识执行
+    #   quarantine_junk.py   dist 引用是**保护性排除项**（"dist 子树先删再迁
+    #                         无意义"）；迁移后产品在仓库外，仓库内 dist/ 不再
+    #                         产生，该规则对本地回退构建仍生效，两种布局都对
+    #   fix_package_workflows.py 修的是包级 workflow 文本；替换目标 <Pkg>/dist/
+    #                         与 CI 回退布局一致（CI 无 D:\Portapps 时自动回退
+    #                         仓库内 dist，_paths 第 4 条），无需按产品根改
+    EXEMPT = {"_paths.py", "restructure_kuku.py", "audit_pre_release.py",
+              "gen_report.py", "fix_package_gitignore.py",
+              "update_template.py", "scaffold.py",
+              "quarantine_junk.py", "fix_package_workflows.py"}
+    DIST_REF = re.compile(r"['\"]dist['\"]|/dist/|dist.*\\\\")
+    hard, partial = [], []
     for tf in TOOL_FILES:
+        if tf.name in EXEMPT:
+            continue
         try:
             t = tf.read_text(encoding="utf-8-sig", errors="replace")
         except OSError:
             continue
-        if re.search(r"['\"]dist['\"]|/dist/|dist.*\\\\", t) and \
-                "audit_pre_release" not in tf.name:
+        if not DIST_REF.search(t):
+            continue                       # 压根不碰 dist，与迁移无关
+        if "import _paths" in t:
+            partial.append(tf.relative_to(REPO).as_posix())
+        else:
             hard.append(tf.relative_to(REPO).as_posix())
     ws = [d for d in sorted(REPO.glob("*/.github/workflows/ci.yml"))]
-    notes.append("引用 dist 的工具/脚本 %d 个、包级 workflow %d 个——"
-                 "外迁 dist 需一并适配" % (len(hard), len(ws)))
-    return tracked, hard
+    notes.append("引用 dist 的工具/脚本 %d 个（未适配 %d / 已接入 _paths 但仍提及 %d）、"
+                 "包级 workflow %d 个——外迁 dist 需一并适配"
+                 % (len(hard) + len(partial), len(hard), len(partial), len(ws)))
+    return tracked, (hard, partial)
 
 
 def main():
@@ -303,6 +344,7 @@ def main():
     ntext = scan_text(True, deep, fails, warns, hits)
     ud_n, ud_b = scan_junk(deep, junk)
     tracked_dist, hard_tools = audit_dist_impact(fails, warns, notes)
+    hard, partial = hard_tools
 
     print("=" * 72)
     print("开源发布前综合审计（只读）  仓库根：%s" % REPO_ROOT)
@@ -347,9 +389,13 @@ def main():
     print("\n【E】dist 迁移影响面")
     for n in notes:
         print("  - %s" % n)
-    if hard_tools:
-        print("  需适配 dist 根的工具：")
-        for h in hard_tools[:20]:
+    if hard:
+        print("  ★ 未适配（迁移后必错）%d 个：" % len(hard))
+        for h in hard:
+            print("      %s" % h)
+    if partial:
+        print("  已接入 _paths 但仍提及 dist（多为回退分支/注释，人工确认）%d 个：" % len(partial))
+        for h in partial:
             print("      %s" % h)
 
     print("\n" + "-" * 72)

@@ -23,12 +23,19 @@ ROOT = Path(__file__).resolve().parents[2]
 TEMPLATE = """\
 # 包级 .gitignore —— 只入库「配方」，不入库「产物」
 #
-# dist/ 是可运行产物：里面是第三方程序二进制、PAL 构建出的启动器 exe、
-# help.html 以及运行期数据，全部可由 portableapps/ + _shared/ 重新生成。
-# 默认整棵树排除，只放行两类**源码/元数据**：
-#   update.py    —— 本包的更新策略（由 _shared/update_engine.py
-#                   + _shared/configs/{pkg}.yaml 装配，是配方的一部分）
-#   version.json —— 版本元数据
+# 2026-10-18 起，可运行产物已整体迁出仓库到产品根（默认 D:\\Portapps）。
+# 本文件保留 dist/ 排除段，是为了：
+#   1) 兼容尚未迁移的环境（dist/<Pkg>/ 仍在仓库内）；
+#   2) 兜底任何把产物误建回仓库内的情况（构建输出已改指产品根，正常不会发生）。
+# update.py / version.json 已随产物迁到产品根，在仓库外，无需放行。
+#
+# portableapps/ 是构建输入树：AppInfo 等元数据要入库；
+# App/<程序>/（第三方二进制）与 Data/（运行期数据）由根级 .gitignore 统一排除
+portableapps/Data/
+portableapps/DefaultData/
+portableapps/App/AppInfo/Launcher/*.ini.bak
+
+# 兼容/兜底：仓库内若还有 dist 树，默认排除，只放行两类策略源码
 dist/*
 !dist/{pkg}/
 dist/{pkg}/*
@@ -38,12 +45,6 @@ dist/{pkg}/*
 # 构建中间产物
 build/
 *.paf.exe
-
-# portableapps/ 是构建输入树：AppInfo 等元数据要入库；
-# App/<程序>/（第三方二进制）与 Data/（运行期数据）由根级 .gitignore 统一排除
-portableapps/Data/
-portableapps/DefaultData/
-portableapps/App/AppInfo/Launcher/*.ini.bak
 
 # 通用临时 / 备份（.bakfix 是 appinfo 修复脚本的备份，*.bak 规则匹配不到）
 *.log
@@ -60,7 +61,9 @@ def main() -> int:
     n = 0
     for pkg_dir in sorted(p for p in ROOT.iterdir() if p.is_dir()
                           and p.name.endswith("Portable")
-                          and (p / "dist").is_dir()):
+                          # 枚举只看源树 portableapps/：产物已迁到仓库外的
+                          # 产品根，老条件 (p/"dist").is_dir() 迁移后会漏包。
+                          and (p / "portableapps").is_dir()):
         pkg = pkg_dir.name
         target = pkg_dir / ".gitignore"
         old = target.read_bytes() if target.exists() else b""
