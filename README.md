@@ -82,6 +82,7 @@ python _shared/update/runner.py --check --all --report
 | [`docs/03-构建与发布.md`](docs/03-构建与发布.md) | 构建流程、版本号、发布与开源合规 |
 | [`docs/04-避坑手册.md`](docs/04-避坑手册.md) | **踩坑清单（务必先读）** |
 | [`docs/05-验收与排查.md`](docs/05-验收与排查.md) | 冒烟/审计工具用法与判定标准 |
+| [`docs/06-开源与发布.md`](docs/06-开源与发布.md) | 推 GitHub / Gitee、二进制分发、体积配额实测 |
 | [`_shared/tools/README.md`](_shared/tools/README.md) | 生产级工具链用法（审计 / 冒烟 / 修复 / 验证） |
 | [`_shared/scripts/README.md`](_shared/scripts/README.md) | 通用构建与测试脚本（39 包共用一份） |
 | [`docs/reports/`](docs/reports/) | 历次验收与排查报告 |

@@ -2,6 +2,36 @@
 
 本项目采用「配方开源（MIT）+ 二进制不随仓库分发」的模式。版本号遵循语义化版本。
 
+## [1.5.0] — 2026-10-18
+
+### 新增
+- `docs/06-开源与发布.md` —— GitHub / Gitee 双远端推送步骤、二进制分发三选项、
+  体积配额实测、推送前自检清单
+- `_shared/tools/verify_roundtrip.py` —— 比对克隆前后每个文件的编码/BOM 是否被改写
+  （实测 1707 文件零漂移，UTF-16LE 保护生效）
+
+### 修复
+- **★ CI 在新克隆里「假红」**：`audit_repo.py` 默认同审 dist/portableapps 两棵树，
+  而 `.gitignore` 排除了 dist 下的二进制，克隆里 39 个包全员报「缺 appinfo.ini」→ 0/39。
+  改为按包自适应：portableapps 恒审，dist 仅在本机已装配时才审；
+  跳过时打印提示而非静默；0 个包被审计时判失败
+- **★ CI 病态扫描「假绿」（源仓库里同样是假绿）**：`check_custom_nsh.py` 的过滤条件
+  仍是 `ExecToStack + Command`，但 2026-10-17 起全仓已改为 FileWrite 生成 .ps1
+  + `-File` 传参，该条件命中 **0 行**，门禁实际上一直在扫空集且恒 exit 0。
+  重建为句柄感知 + 目标后缀分类的扫描面；病态逻辑收敛到 `scan_file()` 单一实现，
+  `audit_repo.py` 改为复用；扫到 0 个文件 / 0 个相关行时判失败
+- 修复 3 份活跃文档里已失效的脚本路径（`<旧工作区>/scripts\*.py` → `_shared/tools\*.py`），
+  并移除已被精简掉的 `batch_rebuild.py` 引用
+
+### 文档
+- `docs/README.md`、根 `README.md` 文档地图加入 06
+- `docs/03-构建与发布.md` 的「首次开源前收尾」按已完成状态更新
+- `docs/README.md` 的「脚本仓库」一节改为反映工具链已入仓的事实
+
+### 已知遗留
+- WeMeetPortable 两棵树的 `Custom.nsh` 差 18 字节（dist 略旧），重建后可消除
+- 本地 git 身份仍是占位符，推送前须 `--amend --reset-author`（见 06 §2）
+
 ## [1.4.0] — 2026-10-18
 
 ### 修复

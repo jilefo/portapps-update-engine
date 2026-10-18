@@ -7,6 +7,7 @@
 | 03 | [构建与发布](03-构建与发布.md) | 要发版、要开源发布 |
 | 04 | [**避坑手册**](04-避坑手册.md) | **动手前必读**（能省大量返工） |
 | 05 | [验收与排查](05-验收与排查.md) | 要验证、要排查启动/数据问题 |
+| 06 | [开源与发布](06-开源与发布.md) | 要推 GitHub / Gitee、要分发二进制 |
 
 ## 历史沉淀
 
@@ -29,14 +30,20 @@
 
 ## 脚本仓库
 
-本仓库只放便携包与文档。**构建/审计/冒烟脚本位于**
-`<旧工作区>/scripts\`（尚未迁入本仓库），主要包括：
+构建/审计/冒烟脚本**已全部固化进本仓库**（2026-10-18 从仓库外迁入，
+并去掉了绝对路径硬编码），任何人 clone 后即可复现全部验收：
+
+- `_shared/tools/` —— 只读检查 + 动态冒烟 + 修复工具（19 个）
+- `_shared/scripts/` —— 构建 / 打包 / 结构校验 / SBOM（5 个）
+- `_shared/*.py` —— 更新引擎与迁移期一次性脚本
+
+完整清单见 [`_shared/tools/README.md`](../_shared/tools/README.md)，
+命令速查见 [05 · 验收与排查](05-验收与排查.md)。常用的几个：
 
 | 脚本 | 用途 |
 |---|---|
-| `audit_production.py` | 生产级静态审计（不启动应用） |
-| `smoke_3rounds.py` | 全库 3 轮启动冒烟 |
-| `smoke_clean.py` / `smoke_real.py` | 单包干净环境探针 |
-| `fix_appinfo_production.py` | appinfo 缺陷修复 |
-| `normalize_ini_encoding.py` | ini 编码归一化（**注意 §1.4，慎用**） |
-| `migrate_docs.py` | 文档迁移（复制+校验+改路径+删源） |
+| `tools/audit_repo.py` | 开源仓库结构自检（CI 用，不依赖二进制） |
+| `tools/audit_production.py` | 生产级静态审计（不启动应用） |
+| `tools/smoke_3rounds.py` | 全库 3 轮启动冒烟 |
+| `tools/smoke_clean.py` / `tools/smoke_real.py` | 单包干净环境探针 |
+| `scripts/test_structure.py` | PAL 结构校验（`--ini-only` 供 CI） |
