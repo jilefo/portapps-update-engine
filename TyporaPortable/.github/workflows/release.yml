@@ -1,0 +1,23 @@
+﻿name: release
+on:
+  push:
+    tags: ['v*']
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: 构建便携包
+        run: python _shared/scripts/build-portable.py TyporaPortable
+      - name: 生成校验和
+        run: python _shared/scripts/package-paf.py TyporaPortable --checksum-only
+      - name: 创建 GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            TyporaPortable/dist/*.7z
+            TyporaPortable/dist/SHA256SUMS

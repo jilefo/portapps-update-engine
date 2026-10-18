@@ -1,0 +1,42 @@
+﻿project: CherryStudioPortable
+dir: CherryStudioPortable\dist\CherryStudioPortable
+category: 常规
+publisher: ''
+current_version: 2.1.6.0
+update_channel: stable
+version_source:
+  type: manual
+  note: 无已验证在线版本源；人工下载后 ingest 接管
+package_type: unknown
+extract_strategy: manual_fallback
+entry_exe: CherryStudio\Cherry Studio.exe
+app_subdir: CherryStudio
+launcher_args: []
+data_dir: Data
+protected_paths:
+- Data
+- App/AppInfo
+- CherryStudioPortable.exe
+extensions_dir: ''
+updater_disable:
+  args: []
+  components: auto_scan
+test_profile:
+  scenarios:
+  - S01
+  - S02
+  - S03
+  - S08
+  - S12
+  soak_seconds: 30
+full_regression_trigger:
+- major_version_jump
+- high_risk_diff
+- smoke_fail_fixed
+rollback_policy:
+  keep_versions: 3
+release_policy: manual_confirm
+schedule: monthly
+delta_update: false
+proxy: ''
+last_checked_at: ''

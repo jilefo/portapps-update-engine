@@ -1,0 +1,30 @@
+﻿name: release
+on:
+  push:
+    tags: ['v*']
+
+jobs:
+  release:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: 构建便携包
+        run: python _shared/scripts/build-portable.py CherryStudioPortable
+      - name: 结构校验
+        run: python _shared/scripts/test_structure.py CherryStudioPortable
+      - name: 打包并生成校验和
+        run: python _shared/scripts/package-paf.py CherryStudioPortable
+      - name: 生成 SBOM
+        run: python _shared/scripts/gen-sbom.py CherryStudioPortable
+      - name: 创建 GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            CherryStudioPortable/dist/*.zip
+            CherryStudioPortable/dist/SHA256SUMS
+            CherryStudioPortable/dist/sbom.spdx.json

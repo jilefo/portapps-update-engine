@@ -1,0 +1,24 @@
+﻿name: Bug 报告
+description: 报告便携包的问题
+title: "[Bug] "
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: 问题描述
+      description: 发生了什么？预期行为是什么？
+    validations:
+      required: true
+  - type: textarea
+    id: env
+    attributes:
+      label: 环境
+      description: Windows 版本、便携包版本、是否含空格/中文路径
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: 证据
+      description: Data 目录结构、日志、截图

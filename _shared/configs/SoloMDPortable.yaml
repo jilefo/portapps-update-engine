@@ -1,0 +1,45 @@
+﻿project: SoloMDPortable
+dir: SoloMDPortable\dist\SoloMDPortable
+category: 常规
+publisher: ''
+current_version: 5.0.1.0
+update_channel: stable
+version_source:
+  type: github_releases
+  repo: zhitongblog/solomd
+  asset_regex: SoloMD_.*_x64-portable\.zip$
+  last_verified_at: '2026-10-16'
+  note: 实证命中，v5.0.1；sha256 与官方 SHA256SUMS.txt 匹配
+package_type: zip
+extract_strategy: static_unpack
+entry_exe: SoloMD\SoloMD.exe
+app_subdir: SoloMD
+launcher_args: []
+data_dir: Data
+protected_paths:
+- Data
+- App/AppInfo
+- SoloMDPortable.exe
+extensions_dir: ''
+updater_disable:
+  args: []
+  components: auto_scan
+test_profile:
+  scenarios:
+  - S01
+  - S02
+  - S03
+  - S08
+  - S12
+  soak_seconds: 30
+full_regression_trigger:
+- major_version_jump
+- high_risk_diff
+- smoke_fail_fixed
+rollback_policy:
+  keep_versions: 3
+release_policy: manual_confirm
+schedule: monthly
+delta_update: false
+proxy: ''
+last_checked_at: ''

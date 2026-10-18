@@ -1,0 +1,21 @@
+# 包级 .gitattributes
+# 默认：自动识别文本，检出用 CRLF（Windows 上的 NSIS/PAL 工具链要 CRLF）
+* text=auto eol=crlf
+
+# 已知二进制
+*.png binary
+*.ico binary
+*.bmp binary
+*.gif binary
+*.exe binary
+*.dll binary
+*.pak binary
+*.bin binary
+*.dat binary
+
+# ★ 编码敏感：Launcher ini 可能是 UTF-16LE（含中文路径值时必须是），
+#   行尾转换会毁掉它 → 按二进制处理。与根级 .gitattributes 同义。
+#   注意：必须放在 `* text=auto eol=crlf` 之后，同文件内后行覆盖前行。
+portableapps/App/AppInfo/Launcher/*.ini  -text
+dist/QoderCNIDEPortable/App/AppInfo/Launcher/*.ini    -text
+*.bakfix  -text

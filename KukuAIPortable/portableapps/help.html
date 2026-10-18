@@ -1,0 +1,55 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>KukuAIPortable Portable 使用帮助</title>
+<style>
+ body { font-family: "Microsoft YaHei", "Segoe UI", sans-serif;
+        max-width: 760px; margin: 40px auto; padding: 0 20px;
+        line-height: 1.7; color: #222; }
+ h1 { border-bottom: 2px solid #2b6cb0; padding-bottom: 8px; }
+ h2 { margin-top: 28px; color: #2b6cb0; }
+ code { background: #f4f6f8; padding: 2px 6px; border-radius: 3px; }
+ .ver { color: #666; font-size: 0.9em; }
+ table { border-collapse: collapse; width: 100%; margin: 12px 0; }
+ td, th { border: 1px solid #dde; padding: 8px 10px; text-align: left; }
+ th { background: #f4f6f8; }
+</style>
+</head>
+<body>
+<h1>KukuAIPortable Portable <span class="ver"></span></h1>
+<p>KukuAIPortable Portable 的便携化版本。</p>
+
+<h2>一、快速开始</h2>
+<p>解压到任意目录（路径可含空格与中文），双击
+<code>KukuAIPortable.exe</code> 即可运行，无需安装。</p>
+
+<h2>二、数据存放位置</h2>
+<p>所有用户数据写入便携包内的 <code>Data\</code> 目录：</p>
+<table>
+  <tr><th>内容</th><th>位置</th></tr>
+  <tr><td>配置与会话</td><td><code>Data\settings\</code></td></tr>
+  <tr><td>缓存与临时文件</td><td><code>Data\settings\local\</code>、<code>Data\settings\Temp\</code></td></tr>
+</table>
+<p><strong>备份</strong>只需复制 <code>Data\</code> 目录；
+<strong>恢复初始状态</strong>删除 <code>Data\</code> 目录即可。</p>
+
+<h2>三、卸载</h2>
+<p>删除整个便携包目录即完成卸载，宿主系统零残留。</p>
+
+<h2>四、注意事项</h2>
+<ul>
+  <li>请勿把便携包放在需要管理员权限写入的位置（如 <code>C:\Program Files</code>）。</li>
+  <li>可移动到任意盘符（含 U 盘），但运行中请勿拔出。</li>
+  <li>本包为单用户设计；多用户共用请各自复制一份完整目录。</li>
+</ul>
+
+<h2>五、更多信息</h2>
+<ul>
+  <li>构建与发布说明：仓库 <code>docs/</code> 目录</li>
+  <li>原软件许可与来源：仓库 <code>THIRD_PARTY_NOTICES.md</code></li>
+  <li>问题反馈：项目 GitHub Issues</li>
+</ul>
+
+</body>
+</html>

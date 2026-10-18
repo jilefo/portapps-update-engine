@@ -1,0 +1,19 @@
+﻿name: portableapps
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: 构建 PortableApps 目录
+        run: python _shared/scripts/build-portable.py TyporaPortable
+      - name: 上传 artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: TyporaPortable
+          path: TyporaPortable/dist/

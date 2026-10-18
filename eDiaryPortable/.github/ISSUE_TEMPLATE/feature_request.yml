@@ -1,0 +1,11 @@
+﻿name: 功能建议
+description: 对便携化或构建流程的建议
+title: "[Feature] "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: 建议内容
+    validations:
+      required: true

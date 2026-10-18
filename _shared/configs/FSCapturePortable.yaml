@@ -1,0 +1,46 @@
+﻿project: FSCapturePortable
+dir: FSCapturePortable\dist\FSCapturePortable
+category: 常规
+publisher: ''
+current_version: 11.3.0.0
+update_channel: stable
+version_source:
+  type: lanzou_folder
+  url: https://osssr.lanzoum.com/b01u8ekhg
+  version_regex: FastStoneCapture\.(\d+\.\d+(?:\.\d+)*)\.
+  last_verified_at: '2026-10-16'
+  note: OSSSR(欧阳)蓝奏云文件夹分享，第三方便携重打包源（非 FastStone 官网）；实证命中 FastStoneCapture.11.3.Portable
+    OSSSR.7z（11.3，6.7MB）；该分享页带 acw_sc__v2 反爬，detect 已内置解盾后经 filemoreajax 取列表，分享页不提供稳定直链
+package_type: zip
+extract_strategy: static_unpack
+entry_exe: FSCapture\FSCapture.exe
+app_subdir: FSCapture
+launcher_args: []
+data_dir: Data
+protected_paths:
+- Data
+- App/AppInfo
+- FSCapturePortable.exe
+extensions_dir: ''
+updater_disable:
+  args: []
+  components: auto_scan
+test_profile:
+  scenarios:
+  - S01
+  - S02
+  - S03
+  - S08
+  - S12
+  soak_seconds: 30
+full_regression_trigger:
+- major_version_jump
+- high_risk_diff
+- smoke_fail_fixed
+rollback_policy:
+  keep_versions: 3
+release_policy: manual_confirm
+schedule: monthly
+delta_update: false
+proxy: ''
+last_checked_at: ''

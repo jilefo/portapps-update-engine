@@ -1,0 +1,49 @@
+﻿project: FeishuPortable
+dir: FeishuPortable\dist\FeishuPortable
+category: 常规
+publisher: ''
+current_version: 8.2.14.0
+update_channel: stable
+version_source:
+  type: api
+  url: https://www.feishu.cn/api/package_info
+  params:
+    platform: '16'
+  version_field: data.version_number
+  version_regex: V(\d+\.\d+\.\d+)
+  url_field: data.download_link
+  last_verified_at: '2026-10-16'
+  note: 实证命中，8.2.14；download_link 为一次性签名直链（x-expires/x-signature），detect 只读版本号
+package_type: 7z_sfx
+extract_strategy: static_unpack
+entry_exe: Feishu\Feishu.exe
+app_subdir: Feishu
+launcher_args: []
+data_dir: Data
+protected_paths:
+- Data
+- App/AppInfo
+- FeishuPortable.exe
+extensions_dir: ''
+updater_disable:
+  args: []
+  components: auto_scan
+test_profile:
+  scenarios:
+  - S01
+  - S02
+  - S03
+  - S08
+  - S12
+  soak_seconds: 30
+full_regression_trigger:
+- major_version_jump
+- high_risk_diff
+- smoke_fail_fixed
+rollback_policy:
+  keep_versions: 3
+release_policy: manual_confirm
+schedule: monthly
+delta_update: false
+proxy: ''
+last_checked_at: ''

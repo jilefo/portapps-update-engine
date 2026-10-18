@@ -1,0 +1,40 @@
+# ═══════════════════════════════════════════════════════════════
+# 根级 .gitattributes —— 便携软件集合仓库
+# 唯一目的：**防止 git 的行尾/编码转换毁掉编码敏感文件**
+# ═══════════════════════════════════════════════════════════════
+
+# 默认策略：自动识别文本，检出用 CRLF（Windows 上的 NSIS/PAL 工具链要 CRLF）
+* text=auto eol=crlf
+
+# ── 编码敏感文件：一律按二进制处理，禁止任何行尾转换 ──
+# 本仓库有两条硬编码铁律（见 docs/04-避坑手册.md §1.4）：
+#   1) Launcher\*.ini 若含中文路径值，必须是 UTF-16LE。
+#      NSIS 按 ANSI 解析 UTF-8 会让路径乱码 → 启动失败。
+#      一旦被 autocrlf 改写字节，症状就是"重启后软件起不来"且极难排查。
+#   2) PAL 语言文件 *.nlf / 部分 *.nsh 原生就是 UTF-16LE。
+# git 通常靠"前 8000 字节含 NUL"自动把 UTF-16LE 判为二进制，
+# 但那是隐式行为 —— 这里显式声明，换任何 git 版本/平台都不赌。
+#
+# ★ 注意：git 通配符 * 不跨目录分隔符。这里是 <包>/portableapps/App/...，
+#   必须写成 **/ 或 */portableapps/...，写成 */App/... 会静默不匹配
+#   （曾用 check-attr 抓到该 silently-fail 的写法）。
+**/App/AppInfo/Launcher/*.ini   -text
+*/portableapps/App/AppInfo/Launcher/*.ini  -text
+*.nlf                          -text
+*.bakfix                       -text
+
+# ── 已知二进制：显式声明，避免 text=auto 误判 ──
+*.png  binary
+*.ico  binary
+*.bmp  binary
+*.gif  binary
+*.exe  binary
+*.dll  binary
+*.pak  binary
+*.bin  binary
+*.dat  binary
+*.paf.exe binary
+
+# ── 生成类文件：不做差异高亮也不做合并，减少无意义冲突 ──
+CHANGELOG.md      merge=union
+docs/reports/*.md merge=union

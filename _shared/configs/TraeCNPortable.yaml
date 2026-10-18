@@ -1,0 +1,42 @@
+﻿project: TraeCNPortable
+dir: TraeCNPortable\dist\TraeCNPortable
+category: 高频高危
+publisher: 字节跳动
+current_version: 3.4.2
+update_channel: stable
+version_source:
+  type: manual
+  note: 无已验证在线版本源；人工下载后 ingest 接管
+package_type: unknown
+extract_strategy: manual_fallback
+entry_exe: Trae CN\Trae CN.exe
+app_subdir: Trae CN
+launcher_args: []
+data_dir: Data
+protected_paths:
+- Data
+- App/AppInfo
+- TraeCNPortable.exe
+extensions_dir: ''
+updater_disable:
+  args: []
+  components: auto_scan
+test_profile:
+  scenarios:
+  - S01
+  - S02
+  - S03
+  - S08
+  - S12
+  soak_seconds: 30
+full_regression_trigger:
+- major_version_jump
+- high_risk_diff
+- smoke_fail_fixed
+rollback_policy:
+  keep_versions: 3
+release_policy: manual_confirm
+schedule: weekly
+delta_update: false
+proxy: ''
+last_checked_at: ''

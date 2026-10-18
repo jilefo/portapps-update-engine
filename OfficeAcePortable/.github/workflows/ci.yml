@@ -1,0 +1,18 @@
+﻿name: ci
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  validate:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: 结构校验
+        run: python _shared/scripts/test_structure.py OfficeAcePortable
+      - name: INI 校验
+        run: python _shared/scripts/test_structure.py OfficeAcePortable --ini-only

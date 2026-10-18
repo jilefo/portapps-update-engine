@@ -1,0 +1,46 @@
+﻿project: ReNamerPortable
+dir: ReNamerPortable\dist\ReNamerPortable
+category: 常规
+publisher: ''
+current_version: 7.10.0.0
+update_channel: stable
+version_source:
+  type: lanzou_folder
+  url: https://gndown.lanzoub.com/b048rm8vg
+  version_regex: _(\d+\.\d+(?:\.\d+)*)-
+  last_verified_at: '2026-10-16'
+  note: 果核剥壳(ghpym)蓝奏云文件夹分享，第三方分发页（非 den4b 官方源）；实证命中 renamer_pro_7.10-Portable.7z（7.10）；detect
+    复现其 filemoreajax 接口取文件列表，分享页不提供稳定直链
+package_type: 7z
+extract_strategy: static_unpack
+entry_exe: ReNamer\ReNamer.exe
+app_subdir: ReNamer
+launcher_args: []
+data_dir: Data
+protected_paths:
+- Data
+- App/AppInfo
+- ReNamerPortable.exe
+extensions_dir: ''
+updater_disable:
+  args: []
+  components: auto_scan
+test_profile:
+  scenarios:
+  - S01
+  - S02
+  - S03
+  - S08
+  - S12
+  soak_seconds: 30
+full_regression_trigger:
+- major_version_jump
+- high_risk_diff
+- smoke_fail_fixed
+rollback_policy:
+  keep_versions: 3
+release_policy: manual_confirm
+schedule: monthly
+delta_update: false
+proxy: ''
+last_checked_at: ''

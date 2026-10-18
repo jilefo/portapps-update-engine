@@ -1,0 +1,42 @@
+﻿project: QoderCNIDEPortable
+dir: QoderCNIDEPortable\dist\QoderCNIDEPortable
+category: 高频高危
+publisher: 阿里云
+current_version: 1.106.3
+update_channel: stable
+version_source:
+  type: manual
+  note: 无已验证在线版本源；人工下载后 ingest 接管
+package_type: unknown
+extract_strategy: manual_fallback
+entry_exe: Qoder CN IDE\Qoder CN IDE.exe
+app_subdir: Qoder CN IDE
+launcher_args: []
+data_dir: Data
+protected_paths:
+- Data
+- App/AppInfo
+- QoderCNIDEPortable.exe
+extensions_dir: ''
+updater_disable:
+  args: []
+  components: auto_scan
+test_profile:
+  scenarios:
+  - S01
+  - S02
+  - S03
+  - S08
+  - S12
+  soak_seconds: 30
+full_regression_trigger:
+- major_version_jump
+- high_risk_diff
+- smoke_fail_fixed
+rollback_policy:
+  keep_versions: 3
+release_policy: manual_confirm
+schedule: weekly
+delta_update: false
+proxy: ''
+last_checked_at: ''

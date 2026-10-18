@@ -1,0 +1,57 @@
+name: 启动 / 数据落地异常
+description: 报告某个便携包打不开、启动错组件、或数据没落到 Data 目录
+title: "[BUG] <包名>：<一句话现象>"
+labels: ["bug"]
+body:
+  - type: markdown
+    value: |
+      提交前请先查 `docs/04-避坑手册.md` 的速查表，很多现象已有结论。
+
+  - type: input
+    id: package
+    attributes:
+      label: 包名
+      placeholder: 例如 CursorPortable
+    validations:
+      required: true
+
+  - type: dropdown
+    id: symptom
+    attributes:
+      label: 现象分类
+      options:
+        - 双击后无任何窗口 / 进程秒退
+        - 启动的是错组件（如点文字却开表格）
+        - 弹出中止框 / 报错框
+        - 数据没写进 Data 目录（写到宿主机器了）
+        - 退出后留下 junction / 目录残留
+        - 图标不对
+        - 其他
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: 复现步骤
+      placeholder: |
+        1. 双击 dist/<Pkg>/<Pkg>.exe
+        2. ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: 验证证据
+      description: 贴出冒烟脚本输出，便于定位
+      placeholder: |
+        python _shared/tools/smoke_real.py <Pkg> 25
+        [<Pkg>] => PASS / FAIL
+      render: shell
+
+  - type: input
+    id: env
+    attributes:
+      label: 环境
+      placeholder: Windows 版本 / PortableApps.com Launcher 版本 / 包版本

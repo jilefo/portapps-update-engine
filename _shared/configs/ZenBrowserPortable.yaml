@@ -1,0 +1,45 @@
+﻿project: ZenBrowserPortable
+dir: ZenBrowserPortable\dist\ZenBrowserPortable
+category: 常规
+publisher: ''
+current_version: 1.23.2.0
+update_channel: stable
+version_source:
+  type: github_releases
+  repo: zen-browser/desktop
+  asset_regex: zen\.installer\.exe$
+  last_verified_at: '2026-10-16'
+  note: 实证命中，1.23.2b；排除 zen.installer-arm64.exe
+package_type: 7z_sfx
+extract_strategy: static_unpack
+entry_exe: Zen\zen.exe
+app_subdir: Zen
+launcher_args: []
+data_dir: Data
+protected_paths:
+- Data
+- App/AppInfo
+- ZenBrowserPortable.exe
+extensions_dir: ''
+updater_disable:
+  args: []
+  components: auto_scan
+test_profile:
+  scenarios:
+  - S01
+  - S02
+  - S03
+  - S08
+  - S12
+  soak_seconds: 30
+full_regression_trigger:
+- major_version_jump
+- high_risk_diff
+- smoke_fail_fixed
+rollback_policy:
+  keep_versions: 3
+release_policy: manual_confirm
+schedule: monthly
+delta_update: false
+proxy: ''
+last_checked_at: ''

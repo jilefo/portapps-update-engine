@@ -1,0 +1,58 @@
+name: ci
+
+# 说明：CI 只做「不依赖第三方二进制」的校验。
+# 本仓库的 App\ 程序文件被 .gitignore 排除，CI 环境里根本不存在，
+# 因此不能跑需要真启动应用的冒烟（smoke_*.py），那些留给本机执行。
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  structure-audit:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 工具链编译校验
+        run: python -m compileall -q _shared/tools
+
+      - name: 仓库结构自检（元数据 / appinfo / Launcher / Custom.nsh / 编码铁律）
+        run: python _shared/tools/audit_repo.py
+
+      - name: Custom.nsh 病态扫描
+        run: python _shared/tools/check_custom_nsh.py
+
+      - name: PAL 结构校验（--ini-only：CI 无二进制，跳过 dist 产物检查）
+        run: |
+          $pkgs = Get-ChildItem -Directory -Filter "*Portable" | Select-Object -ExpandProperty Name
+          $bad = 0
+          foreach ($p in $pkgs) {
+            python _shared/scripts/test_structure.py $p --ini-only
+            if ($LASTEXITCODE -ne 0) { $bad = 1; Write-Host "FAIL: $p" }
+          }
+          exit $bad
+
+      - name: 确认仓库未混入二进制
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "== 检查是否误提交体积异常的文件（>20MB）=="
+          found=0
+          while IFS= read -r f; do
+            sz=$(wc -c < "$f")
+            if [ "$sz" -gt 20971520 ]; then
+              echo "  [过大] $f ($sz bytes)"; found=1
+            fi
+          done < <(git ls-files)
+          echo "== 检查是否误提交 Data / 打包产物 =="
+          if git ls-files | grep -E '(^|/)(Data|RuntimeData)/|\.paf\.exe$|\.bak' ; then
+            echo "  [违规] 发现不应提交的文件"; found=1
+          fi
+          exit $found

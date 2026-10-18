@@ -1,0 +1,44 @@
+﻿project: JoplinPortable
+dir: JoplinPortable\dist\JoplinPortable
+category: 常规
+publisher: Laurent Cozic & Joplin Team
+current_version: 3.7.21
+update_channel: stable
+version_source:
+  type: github_releases
+  repo: laurent22/joplin
+  asset_regex: Joplin-Setup-.*\.exe$
+  note: 2026-10-15 建包时已实证 NSIS 双层解包链路
+package_type: electron_installer
+extract_strategy: static_unpack
+entry_exe: Joplin\Joplin.exe
+app_subdir: Joplin
+launcher_args: []
+data_dir: Data
+protected_paths:
+- Data
+- App/AppInfo
+- JoplinPortable.exe
+extensions_dir: ''
+updater_disable:
+  args: []
+  components: auto_scan
+test_profile:
+  scenarios:
+  - S01
+  - S02
+  - S03
+  - S08
+  - S12
+  soak_seconds: 30
+full_regression_trigger:
+- major_version_jump
+- high_risk_diff
+- smoke_fail_fixed
+rollback_policy:
+  keep_versions: 3
+release_policy: manual_confirm
+schedule: monthly
+delta_update: false
+proxy: ''
+last_checked_at: ''

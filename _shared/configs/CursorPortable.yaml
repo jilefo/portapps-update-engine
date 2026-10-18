@@ -1,0 +1,48 @@
+﻿project: CursorPortable
+dir: CursorPortable\dist\CursorPortable
+category: 高频高危
+publisher: Anysphere Inc.
+current_version: 3.25.6
+update_channel: stable
+version_source:
+  type: api
+  url: https://www.cursor.com/api/download
+  params:
+    platform: win32-x64
+    releaseTrack: latest
+  version_field: version
+  url_field: downloadUrl
+  note: 2026-10-16 实证可用；stable 通道=3.24.18，latest=3.25.6
+package_type: inno
+extract_strategy: static_unpack
+entry_exe: Cursor\Cursor.exe
+app_subdir: Cursor
+launcher_args: []
+data_dir: Data
+protected_paths:
+- Data
+- App/AppInfo
+- CursorPortable.exe
+extensions_dir: ''
+updater_disable:
+  args: []
+  components: auto_scan
+test_profile:
+  scenarios:
+  - S01
+  - S02
+  - S03
+  - S08
+  - S12
+  soak_seconds: 30
+full_regression_trigger:
+- major_version_jump
+- high_risk_diff
+- smoke_fail_fixed
+rollback_policy:
+  keep_versions: 3
+release_policy: manual_confirm
+schedule: weekly
+delta_update: false
+proxy: ''
+last_checked_at: ''

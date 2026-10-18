@@ -1,0 +1,38 @@
+# EditorConfig —— 关键作用是**防止编码踩坑**
+# 注意：EditorConfig 只能约束编辑器行为，本仓库有几条铁律必须由
+# CI（_shared/tools/audit_repo.py）兜底，详见 docs/04-避坑手册.md §1.4。
+root = true
+
+[*]
+charset = utf-8
+end_of_line = crlf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+[*.md]
+trim_trailing_whitespace = false
+
+[*.nsh]
+# ★ Custom.nsh 必须 UTF-8 且**不带 BOM**：带 BOM 会让 NSIS 报 Invalid command
+charset = utf-8
+end_of_line = crlf
+
+[*.ini]
+charset = utf-8
+
+# ★ 例外：含中文路径的 Launcher ini 必须 UTF-16LE，绝不能是 UTF-8
+#   （NSIS 按 ANSI 解 UTF-8 会让中文路径乱码，程序直接起不来）
+#   典型：MiaoshouPortable/App/AppInfo/Launcher/MiaoshouPortable.ini
+#   该规则无法用 EditorConfig 表达，由 audit_repo.py 检查 E 项强制。
+
+[*.{json,yml,yaml}]
+indent_size = 2
+
+[*.py]
+indent_size = 4
+max_line_length = 100
+
+[Makefile]
+indent_style = tab

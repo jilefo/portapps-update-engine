@@ -1,0 +1,114 @@
+# ═══════════════════════════════════════════════════════════════
+# 根级 .gitignore —— 便携软件集合仓库
+# 原则：只入库「可复现的配方」，不入库「不可复现的产物与第三方二进制」
+# ═══════════════════════════════════════════════════════════════
+
+# 1. 第三方应用程序二进制（不分发，用户自行放入）
+*/dist/*/App/*/
+*/portableapps/App/*/
+!*/dist/*/App/AppInfo/
+!*/portableapps/App/AppInfo/
+!*/portableapps/App/DefaultData/
+
+# 2. 运行期数据（含用户隐私，绝不入库）
+*/dist/*/Data/
+*/portableapps/Data/
+Data/
+
+# 3. PAL 运行期残留
+RuntimeData/
+*/RuntimeData/
+
+# 4. 构建/打包产物
+*.paf.exe
+build/
+*.7z
+*.zip
+
+# 5. 备份与临时文件
+*.bak
+*.bak-*
+*.tmp
+*.log
+*.old
+
+# 6. Python 产物（工具链跑出来的）
+__pycache__/
+*.pyc
+*.pyo
+
+# 7. 编辑器 / 系统
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# 8. 本仓库工具链产生的明细数据（体积大且可再生成）
+docs/reports/*.json
+
+# 9. ★ 制作过程残留（取证快照，绝不入库）
+#    内容：卸载程序（第三方二进制！）、安装/卸载监控 .reg、
+#         文件与注册表日志（含本机绝对路径）、图标提取缓存
+#    归档位置：GreenSoftMake/Backups/制作素材归档/<包名>/
+#    命名不统一的历史遗留：_制作素材/ 与 evidence/ 是同一类东西
+_制作素材/
+制作素材/
+evidence/
+_icons/
+_assets/
+leftover*.txt
+unins*.exe
+unins*.dat
+Uninstall*.exe
+*.reg
+*日志*.txt
+
+# 10. appinfo 修复脚本留下的备份（*.bakfix 不匹配 *.bak，需单独排除）
+*.bakfix
+
+# 11. Launcher 配方目录里的调试残留（制作期工具，做完即清）
+#     AppInfo/Launcher 应只有 <BaseName>.ini / Custom.nsh / *.nlf
+#     注意：gitignore 的 * 不跨目录分隔符，必须写成 */portableapps/... 或用 **/
+*/portableapps/App/AppInfo/Launcher/*.cmd
+*/portableapps/App/AppInfo/Launcher/*.orig
+*/portableapps/App/AppInfo/Launcher/*.bat
+*/portableapps/App/AppInfo/Launcher/*.ps1
+**/App/AppInfo/Launcher/*.cmd
+**/App/AppInfo/Launcher/*.orig
+
+# 10. 产物树里的非标准项（旧版本备份 / 调试输出 / 制作期工具，均不入库）
+*/dist/*/Backups/
+*/dist/*/_diag/
+*/dist/*/innounp.exe
+*/dist/*/Install.bat
+
+# 11. 更新引擎版本元数据（运行期有用，保留）
+!*/dist/*/version.json
+
+# 12. Electron 程序包（第三方二进制，正主在 dist/<Pkg>/App/<程序>/resources/）
+#     曾在包根目录留下 667MB + 176MB 的冗余副本，且不在 App\ 下管不到
+*.asar
+/*Portable/resources/
+
+# 13. 更新引擎的运行时产物（下载缓存 / 回滚备份 / 扫描快照，都可再生成）
+#     一次备份就是上百 MB，且内含程序二进制，绝不能入库
+_shared/update/_cache/
+_shared/update/_backups/
+_shared/update/_facts.json
+_shared/tools/_projects_index.json
+#     ↑ 注意：勿在此行后追加行尾注释，Git 不支持行内注释，
+#       整行会被当成 pattern 导致规则静默失效（曾漏 39 条本机绝对路径）。
+
+# 14. ★ PortableApps.com Launcher + NSIS 工具链（第三方，vendored 副本）
+#     体积约 11MB / 900+ 文件，且 PAL 为 GPL 授权、NSIS 为 zlib 授权，
+#     与本期 MIT「配方」混在一个仓库里授权关系不清 → 不入库。
+#     构建时按以下任一方式提供，定位逻辑见 _shared/toolchain.py：
+#       1) 环境变量 PAF_TOOLCHAIN=<工具链根目录>（根目录下含 toolchain/ 子目录）
+#       2) <仓库根>/_shared/toolchain/PortableApps.comLauncher/（本机默认位置）
+#       3) <项目>/toolchain/
+#     官方获取：https://portableapps.com/development/launcher/
+_shared/toolchain/
+
+# 注意：dist/<Pkg>/update.py 是**策略源码**，要入库（包级 .gitignore 已放行；
+# 根级规则管不到 dist 根目录，无需在此额外放行）

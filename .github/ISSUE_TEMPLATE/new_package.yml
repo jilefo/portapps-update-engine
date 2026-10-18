@@ -1,0 +1,41 @@
+name: 请求新增便携包
+description: 提议把一个软件做成 PortableApps.com 格式的便携版
+title: "[PKG] 请求新增：<软件名>"
+labels: ["enhancement"]
+body:
+  - type: input
+    id: app
+    attributes:
+      label: 软件名称与版本
+      placeholder: 例如 Cursor 3.25.6
+    validations:
+      required: true
+
+  - type: input
+    id: license
+    attributes:
+      label: 是否为自由/免费软件
+      description: 本仓库只做"配方开源"，不分发二进制，请确认许可允许本地使用
+      placeholder: 例如 官方免费版 / MIT / 专有但允许免费使用
+    validations:
+      required: true
+
+  - type: textarea
+    id: datapath
+    attributes:
+      label: 该软件把数据写到哪里
+      description: 便于确定重定向方案（这是便携化的核心）
+      placeholder: |
+        %APPDATA%\Cursor
+        %LOCALAPPDATA%\cursor-updater
+        ...
+
+  - type: checkboxes
+    id: confirm
+    attributes:
+      label: 确认
+      options:
+        - label: 我了解本仓库不分发第三方二进制，需自行准备安装文件
+          required: true
+        - label: 我已阅读 docs/02-架构与目录规范.md
+          required: false
