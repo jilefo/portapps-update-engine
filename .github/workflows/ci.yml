@@ -29,6 +29,13 @@ jobs:
       - name: Custom.nsh 病态扫描
         run: python _shared/tools/check_custom_nsh.py
 
+      # 包级 workflow 共 78 份（39 包 × release/portableapps），由
+      # gen_release_workflows.py 统一生成；--check 逐个比对与模板是否一致，
+      # 并在 PyYAML 可用时顺带解析一遍。没有这道门禁时，78 份里有 72 份
+      # 上传的是根本不存在的 .7z，而流水线照样全绿。
+      - name: 包级 workflow 一致性
+        run: python _shared/tools/gen_release_workflows.py --check
+
       - name: PAL 结构校验（--ini-only：CI 无二进制，跳过 dist 产物检查）
         run: |
           $pkgs = Get-ChildItem -Directory -Filter "*Portable" | Select-Object -ExpandProperty Name

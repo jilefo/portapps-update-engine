@@ -49,6 +49,46 @@
 - `update/runner.py` 的操作提示仍指向已搬走的 `<Pkg>/dist/<Pkg>`，
   改为由 `_paths.product_dir()` 解析
 
+### 包级发布链路（同日完成，此前 64 份 workflow 全坏但全绿）
+- **★★ 34 份包级 `release.yml` 曾产出 0 个附件却一路绿灯**：三处缺陷彼此掩盖——
+  ① 附件写 `*.7z` 而 `package-paf.py` 只产 `.zip`；② 打包步带 `--checksum-only`
+  会跳过打包；③ `package-paf.py` 无产物时 `[WARN] + return 0` 不失败。
+  根因是 workflow 由 scaffold 复制生成、之后只用文本替换修路径，
+  而**文本替换改字符串、改不了语义**
+- **附件路径不再写死**：原先 64 份写 `<Pkg>/dist/*`（工作区相对路径），
+  但产物路径由 `_paths.artifact_root()` 动态解析，实测 CI 新克隆上解析出的位置
+  与写死的必然不同。改由 `print_artifact_paths.py` 从唯一定义处解析后输出
+- **包级发布改发「配方」**：第三方程序被 `.gitignore` 排除（实测 CursorPortable
+  源树 `App/` 只入库 9 个元数据文件，产品树 `App/` 有 995 MB 程序），
+  CI 上构建出的是"有启动器、无程序"的空壳。改为发布
+  `portableapps/` + LICENSE + THIRD_PARTY_NOTICES.md + README.md
+- **tag 作用域加包名前缀**：39 份原都用 `v*`，推一个 `v1.7.0` 会触发 39 条流水线
+  抢建同一个 Release。改为 `<Pkg>@v*`（如 `CursorPortable@v3.25.6`），
+  且不匹配整仓级的 `v[0-9]+.[0-9]+.[0-9]+`
+- 补齐 3 个包缺失的 `release.yml` 与 `portableapps.yml`
+  （FoxitPDFPortable / SublimeTextPortable / WPSOfficePortable）
+- 36 份 `portableapps.yml` 的 `path: <Pkg>/dist/` 在迁移后已不存在，改为动态路径
+- 补 `permissions: contents: write`（34 份缺失，会导致建 Release 时 403）
+
+### 新增
+- `_shared/scripts/package_formula.py` —— 单包配方打包器。★ 以 **git 跟踪集**为准
+  （用 `rglob` 会把本机未跟踪的 `.bak` 备份打进公开产物，实测 18 项混进 2 个垃圾），
+  带体积护栏，并报告打包文件数 / 总字节 / 缺失的可选文件
+- `_shared/tools/print_artifact_paths.py` —— 产物路径解析，复用
+  `package_formula.artifact_paths()` 与 `_paths.artifact_root()`，
+  按 GITHUB_OUTPUT 格式输出；**缺产物 exit 1**（不再 WARN 后 return 0）
+- `_shared/tools/gen_release_workflows.py` —— 78 份包级 workflow 的唯一生成源，
+  `--check` 逐个比对一致性 + YAML 解析，并报出检查量 / 缺失数 / 不符数
+
+### 清理
+- 删除 `JoplinPortable` 下 4 份上游模板遗留工作流（`automerge` /
+  `build-linux` / `build-windows` / `up-release`）：引用上游的
+  `Other/Update/Update.ps1`、`endsWith(github.repository,'Portable')` 在本仓恒假、
+  运行时从第三方仓库 master 拉脚本
+- 删除 6 个**已入库**的备份文件（QQ/QQNT/TIM 各 2 个 `Custom.nsh.bak6/bak7-20261017`），
+  它们会让根 CI 的"未混入二进制"检查失败，且会被发布流程带出去
+  （备份已另存 `build/cleanup-backup-20261019/`，该目录被 `.gitignore` 覆盖）
+
 ### 已知限制（不阻塞发布）
 - CI 自动发布的是**配方包**（git archive + SHA256SUMS + Release Notes），
   不是产品根里的 59 GB 便携产物——后者在仓库外，CI 拿不到也无法构建。

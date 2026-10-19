@@ -1,19 +1,55 @@
-﻿name: portableapps
+# 本文件由 _shared/tools/gen_release_workflows.py 生成，请勿手工编辑。
+#
+# 手动触发的构建验证：在**有第三方程序**的 runner（自建 runner，或已备好
+# 产品根的机器）上才有意义。GitHub 托管 runner 是全新克隆，没有第三方程序，
+# 构建出来的是空壳——这是设计使然，不是故障。
+name: portableapps
 on:
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: windows-latest
+    # ★ env 必须在 job 级：写在某个 step 的 env: 里只对该 step 生效，
+    #   而真正要用它的是后面的 build-portable / package-paf / gen-sbom
+    #   三个 step。放错位置不会报错，只会让它们悄悄解析到默认产品根。
+    env:
+      # 产品根固定到 runner 临时目录：不依赖 D: 盘存在，也不把产物
+      # 写进工作区（否则会被后续 git 操作扫到）。
+      PORTAPPS_ROOT: ${{ runner.temp }}\portapps
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: 构建 PortableApps 目录
+
+      - name: 准备产品根
+        run: New-Item -ItemType Directory -Force -Path "$env:PORTAPPS_ROOT" | Out-Null
+
+      - name: 构建便携包
         run: python _shared/scripts/build-portable.py CursorPortable
+
+      - name: 结构校验
+        run: python _shared/scripts/test_structure.py CursorPortable
+
+      - name: 打包并生成校验和
+        run: python _shared/scripts/package-paf.py CursorPortable
+
+      - name: 生成 SBOM
+        run: python _shared/scripts/gen-sbom.py CursorPortable
+
+      # 原来这里写 path: CursorPortable/dist/ —— 迁移后该目录已不存在，上传必空。
+      - name: 解析产物路径
+        id: artifacts
+        run: python _shared/tools/print_artifact_paths.py CursorPortable --kind product >> $env:GITHUB_OUTPUT
+
       - name: 上传 artifact
         uses: actions/upload-artifact@v4
         with:
           name: CursorPortable
-          path: CursorPortable/dist/
+          path: |
+            ${{ steps.artifacts.outputs.zip }}
+            ${{ steps.artifacts.outputs.sums }}
+            ${{ steps.artifacts.outputs.sbom }}
+          if-no-files-found: error

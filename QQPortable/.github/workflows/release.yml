@@ -1,23 +1,49 @@
-﻿name: release
+# 本文件由 _shared/tools/gen_release_workflows.py 生成，请勿手工编辑；
+# 改模板请改生成器，否则 --check 会报漂移。
+#
+# ★ 发的是「配方」不是程序本体：
+#   第三方程序在 portableapps/App/<程序>/ 下，被 .gitignore 排除，
+#   CI 在新克隆上构建出的产品树是"有启动器、无程序"的空壳，发布它没有意义。
+#   因此这里打包发布的是本包的便携化配方（portableapps/ + LICENSE +
+#   THIRD_PARTY_NOTICES.md + README.md）。
+#   整仓级别的四平台发布走仓库根 .github/workflows/release.yml。
+#
+# ★ tag 带包名前缀（<Pkg>@v*）：
+#   39 个包若都用 v*，推一个 v1.7.0 会同时触发 39 条流水线抢建同一个
+#   Release。加前缀后各发各的，互不干扰。
+name: release
 on:
   push:
-    tags: ['v*']
+    tags: ['QQPortable@v*']
+
+permissions:
+  contents: write          # 创建 Release 需要；缺了会 403
 
 jobs:
   release:
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: 构建便携包
-        run: python _shared/scripts/build-portable.py QQPortable
-      - name: 生成校验和
-        run: python _shared/scripts/package-paf.py QQPortable --checksum-only
-      - name: 创建 GitHub Release
+
+      - name: 结构校验（本包）
+        run: python _shared/scripts/test_structure.py QQPortable --ini-only
+
+      - name: 打包配方
+        run: python _shared/scripts/package_formula.py QQPortable
+
+      # 产物路径由 _paths 动态决定（本机 D:\Portapps / CI 上各不相同），
+      # 不能写死 —— 写死的那 34 份没有一份能对上。
+      - name: 解析产物路径
+        id: artifacts
+        run: python _shared/tools/print_artifact_paths.py QQPortable >> $GITHUB_OUTPUT
+
+      - name: 创建 Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            QQPortable/dist/*.7z
-            QQPortable/dist/QQPortable-SHA256SUMS.txt
+            ${{ steps.artifacts.outputs.formula }}
+            ${{ steps.artifacts.outputs.sums }}
