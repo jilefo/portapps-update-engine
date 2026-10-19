@@ -33,6 +33,18 @@ r"""migrate_dist.py —— dist → <产品根> 逐包原子迁移（同卷 rena
   python migrate_dist.py run --pkg X --yes   # 迁移指定包（跳过被占用的）
   python migrate_dist.py run --yes           # 全量迁移
   python migrate_dist.py verify --pkg X      # 对已迁移包重算并与预迁移 manifest 比对
+  python migrate_dist.py repoint --pkg X     # 重定点包内 junction（预览）
+  python migrate_dist.py repoint --pkg X --yes
+
+经验（踩过才知道）
+----------------
+  * **重定点必须在 rename 之后、用新路径去定位 junction**。曾按迁移前的
+    绝对路径去判 `Path(...).exists()`，rename 之后源树整棵消失 → 恒为 False
+    → 整段 continue，junction 一个都没被修，还误报成 WARN「已不存在」。
+  * **判链接存在要用链接本身的属性（`is_junction`），不能用 `.exists()`**。
+    后者跟随目标，目标悬空即返回 False，恰好跳过最需要修的那些。
+  * **校验只比 junction 数量等于没比**：目标是绝对路径，换根必变；
+    必须折算成树内相对路径再逐个比对，否则悬空联接照样判 PASS。
 
 产物：manifest 存 `_shared/migration/pre/<Pkg>.json`（已在 .gitignore），
 汇总写 `_shared/migration/migration_log.jsonl` 与 stdout 报告。
@@ -137,8 +149,15 @@ def build_manifest(pkg: str, root: Path) -> dict:
             if is_junction(p):
                 tgt = junction_target(p, root)
                 inside = bool(tgt) and tgt.lower().startswith(str(root).lower())
+                # 目标在树内时一并记下「相对根的路径」：迁移只改前缀，
+                # 相对路径应保持不变。没有它，迁移后就只能比数量、
+                # 比不了目标对不对（悬空 junction 照样判 PASS）。
+                trel = ""
+                if inside:
+                    trel = tgt[len(str(root)):].lstrip("\\/").replace("\\", "/")
                 junctions.append({"rel": p.relative_to(root).as_posix(),
-                                  "target": tgt, "inside": inside})
+                                  "target": tgt, "inside": inside,
+                                  "target_rel": trel})
                 dirnames.remove(name)
         for name in filenames:
             p = Path(dirpath) / name
@@ -176,6 +195,61 @@ def load_manifest(pkg: str) -> dict | None:
     return json.loads(p.read_text(encoding="utf-8"))
 
 
+def _jkey(m: dict, j: dict):
+    """junction 的「跨根可比」身份。
+
+    目标是绝对路径，换根后必然不同，所以树内目标一律折算成相对路径再比。
+    老 manifest 没有 target_rel 字段（本轮才加），这里按 root 现推，
+    保证对 38 份已存盘的 pre-manifest 依然可用。
+    """
+    rel = j["rel"]
+    if not j["inside"]:
+        return (rel, False, (j.get("target") or "").lower())
+    tr = j.get("target_rel")
+    if not tr:
+        r = str(m["root"])
+        t = j.get("target") or ""
+        tr = (t[len(r):].lstrip("\\/").replace("\\", "/")
+              if t.lower().startswith(r.lower()) else t)
+    return (rel, True, tr.lower().replace("\\", "/"))
+
+
+def diff_junctions(pre: dict, post: dict):
+    """比对 junction，返回 (判负项, 参考项)。
+
+    **只有「迁移时目标在树内」的 junction 才是迁移的责任**——搬树之后它
+    必须还在，且仍指向新根下的同一相对路径。这条规则正是抓到本次缺陷的
+    那把尺子：目标没跟着换根的 junction，inside 会从 True 变 False。
+
+    反过来，树外目标 junction（宿主重定向、历史遗留悬空联接）是 PAL 在
+    运行时创建、退出时拆除的，数量随每次冒烟起落。拿它判负只会造出一片
+    假红，把真正的迁移损伤淹掉——实测 12 条全是 2026-10-17 前的历史
+    悬空联接，早已被清理，与迁移无关。
+    """
+    bad, notes = [], []
+    pj = {j["rel"]: j for j in pre["junctions"] if j["inside"]}
+    q_all = {j["rel"]: j for j in post["junctions"]}
+    qj = {j["rel"]: j for j in post["junctions"] if j["inside"]}
+    for rel in sorted(set(pj) | set(qj)):
+        a, b = pj.get(rel), qj.get(rel)
+        if a and b:
+            if _jkey(pre, a) != _jkey(post, b):
+                bad.append("junction 迁移后目标不符: rel=%s pre=%s post=%s"
+                           % (rel, _jkey(pre, a), _jkey(post, b)))
+        elif a:
+            # 迁移时是树内目标，现在连链接都不在了 → 必须查
+            bad.append("迁移时树内 junction 现已不在: %s" % rel)
+        elif b:
+            notes.append("迁移后新增树内 junction: %s -> %s"
+                         % (rel, b.get("target")))
+    gone_out = [j["rel"] for j in pre["junctions"]
+                if not j["inside"] and j["rel"] not in q_all]
+    if gone_out:
+        notes.append("树外目标 junction 已不在 %d 条（PAL 运行时/清理所致，"
+                     "非迁移责任）" % len(gone_out))
+    return bad, notes
+
+
 def diff_manifest(pre: dict, post: dict) -> list:
     """返回不一致项列表；空 = 完全一致。"""
     bad = []
@@ -190,9 +264,76 @@ def diff_manifest(pre: dict, post: dict) -> list:
         if pf[k] != qf[k]:
             bad.append("内容/大小不符: %s pre=%s post=%s" % (k, pf[k], qf[k]))
     if pre["junction_count"] != post["junction_count"]:
-        bad.append("junction 数不符: pre=%d post=%d"
-                   % (pre["junction_count"], post["junction_count"]))
+        # 数量差本身不判负：树外 junction 会随冒烟起落（见 diff_junctions 说明）
+        pass
+    bad_j, _ = diff_junctions(pre, post)
+    bad.extend(bad_j)
     return bad
+
+
+# 应用运行时会自己改写的东西。**只认路径、且要求落在 Data/ 下**——
+# 程序体（App/）在运行时不该变，变了就是真问题。
+# 目录级判定：**整个目录都是运行期状态**，按目录认，不逐个认文件名
+# （逐个认文件名必然演变成"为了让某个文件变绿而加词条"，那就是在造假绿）
+VOLATILE_DIRS = ("data/profile/", "data/settings/")
+# 名称/后缀级判定：给目录级兜不住的散落缓存
+VOLATILE_TOKENS = (
+    "/cache2/", "/cache/", "/caches/", "/startupcache/", "/shader-cache/",
+    "/safebrowsing/", "/codecache/", "/gpuache/", "/usagelogs/",
+    "-shm", "-wal", ".sqlite", "settings.ini",
+)
+# 明确的反例：这些即使在 Data/ 下也不是运行期状态
+NOT_VOLATILE_DIRS = ("data/documents", "data/notes", "data/backup")
+
+
+def is_volatile(rel: str) -> bool:
+    """是否属于「应用跑一趟就会变」的运行期状态。
+
+    三条约束，缺一就会变成新的假绿：
+      1. 必须落在 `Data/` 下——`App/` 是程序体，运行时不该变；
+      2. 命中目录级（整个 profile/settings 目录）或名称级（缓存/sqlite）特征；
+      3. 不在反例目录里（用户文档不算运行期状态）。
+
+    目录级优先于逐个文件名：ZenBrowser 的 `broadcast-listeners.json`
+    就是逐个枚举认不出来的（认不出 → 判负 → 逼着人去加词条 → 造假绿）。
+    按「整个 Data/profile/ 都是浏览器 profile」来认，一条规则覆盖全部。
+    """
+    low = rel.lower().replace("\\", "/")
+    if not low.startswith("data/"):
+        return False
+    if any(d in low for d in NOT_VOLATILE_DIRS):
+        return False
+    if low.startswith(VOLATILE_DIRS) or any(d in low for d in VOLATILE_DIRS):
+        return True
+    return any(t in low for t in VOLATILE_TOKENS)
+
+
+def classify_diff(bad: list):
+    """把差异分成「真·判负」与「运行期状态」，返回 (hard, notes)。
+
+    为什么要分：`verify` 的快照把 `Data/` 下的运行期状态也拍了进去，
+    于是**只要跑过一次应用就会 FAIL**（实测冒烟期间 ZenBrowser 40 项、
+    全是 `Data/profile/` 的浏览器缓存与 prefs）。不分的话这道门禁会变成
+    常红，而常红的门禁跟假绿一样会被人忽略。
+
+    怎么保证不滑向假绿：
+      * **「迁移后缺失」一律判负**——文件少了永远是数据丢失，不接受
+        "可能是应用自己删的"这种解释（缓存清理另说，但要先看清楚）；
+      * 只有同时满足「在 Data/ 下」+「命中易变特征」才降级为备注；
+      * 降级了也**要报数量**，让人看见分类确实发生了。
+    """
+    hard, notes = [], []
+    for line in bad:
+        if line.startswith("迁移后缺失:"):
+            hard.append(line)              # 缺失永不降级
+            continue
+        body = line.split(": ", 1)[1]
+        rel = body.split(" pre=")[0]
+        if is_volatile(rel):
+            notes.append(line)
+        else:
+            hard.append(line)
+    return hard, notes
 
 
 # ---------------------------------------------------------------- 进程栅
@@ -327,7 +468,10 @@ def migrate_one(pkg: str, force: bool = False) -> dict:
                   "junctions": pre["junction_count"]}
 
     # 4) 包内绝对目标 junction 清单（迁移后重定点）
-    inside_juncs = [(Path(src) / j["rel"], j["target"])
+    #    存 rel 而非绝对路径：第 5 步 rename 之后 src 整棵就不在了，
+    #    拿迁移前的绝对路径去判存在性必然是 False（曾让本段全程 continue，
+    #    junction 一个都没被重定点，留下指向旧路径的悬空联接）。
+    inside_juncs = [(j["rel"], j["target"])
                     for j in pre["junctions"] if j["inside"] and j["target"]]
 
     # 5) 原子 rename
@@ -342,9 +486,12 @@ def migrate_one(pkg: str, force: bool = False) -> dict:
     # 6) 重定点包内 junction
     if inside_juncs:
         ok_all = True
-        for jp, tgt in inside_juncs:
-            if not jp.exists():
-                print("    [WARN] junction 已不存在: %s" % jp)
+        for rel, tgt in inside_juncs:
+            jp = dst / rel
+            # 必须判「链接本身在不在」，不能用 .exists()——后者会跟随目标，
+            # 目标悬空时返回 False，恰好跳过我们最需要修的那些 junction。
+            if not is_junction(jp):
+                print("    [WARN] junction 链接本身已不在: %s" % jp)
                 continue
             if not repoint_junction(jp, tgt, src, dst):
                 ok_all = False
@@ -456,16 +603,76 @@ def cmd_verify(args) -> int:
             print("  %-26s SKIP（无 manifest 或目录不存在）" % pkg)
             continue
         post = build_manifest(pkg, d)
-        bad = diff_manifest(pre, post)
-        if bad:
-            bad_total += len(bad)
-            print("  %-26s FAIL (%d 项不符)" % (pkg, len(bad)))
-            for x in bad[:5]:
+        raw = diff_manifest(pre, post)
+        hard, vol = classify_diff(raw)
+        _, notes = diff_junctions(pre, post)
+        if hard:
+            bad_total += len(hard)
+            print("  %-26s FAIL (%d 项需查)" % (pkg, len(hard)))
+            for x in hard[:5]:
                 print("     " + x)
         else:
             print("  %-26s PASS（%d 文件 / %.2f MB 全等）"
                   % (pkg, post["file_count"], post["total_bytes"] / 1048576))
+        # 分类结果必须报出来，否则「悄悄放过 40 项」和「真的没有问题」长一样
+        if vol:
+            print("       [运行期] %d 项易变状态变化（应用跑过的正常产物，"
+                  "不计入判定）" % len(vol))
+            for x in vol[:2]:
+                print("         %s" % x.split(": ", 1)[1].split(" pre=")[0])
+        for n in notes:
+            print("       [备注] %s" % n)
     return 0 if bad_total == 0 else 1
+
+
+def cmd_repoint(args) -> int:
+    """按 pre-manifest 把包内 junction 重新指向当前产品根。
+
+    幂等：目标已经正确就跳过，不需要「先破坏再修」。
+    用途有二：① 修历史损伤（迁移时因缺陷没被重定点的悬空联接）；
+    ② 独立于 run 再跑一遍做交叉确认。
+    """
+    pkgs = [args.pkg] if args.pkg else _paths.packages()
+    n_fix = n_ok = n_skip = n_fail = 0
+    for pkg in pkgs:
+        pre = load_manifest(pkg)
+        dst = _paths.product_dir(pkg)
+        if pre is None or not dst.is_dir():
+            n_skip += 1
+            continue
+        src = Path(pre["root"])
+        for j in pre["junctions"]:
+            if not (j["inside"] and j["target"]):
+                continue
+            jp = dst / j["rel"]
+            if not is_junction(jp):
+                print("  %-26s SKIP 链接不在: %s" % (pkg, j["rel"]))
+                n_skip += 1
+                continue
+            want = replace_root_prefix(j["target"], src, dst)
+            if want is None:
+                print("  %-26s FAIL 目标不含源树前缀: %s"
+                      % (pkg, j["target"]))
+                n_fail += 1
+                continue
+            actual = junction_target(jp, dst)
+            if actual and actual.lower() == want.lower():
+                n_ok += 1                      # 已经正确，不动
+                continue
+            if not args.yes:
+                print("  %-26s 待修 %s\n      %s -> %s"
+                      % (pkg, j["rel"], actual, want))
+                n_fix += 1
+                continue
+            if repoint_junction(jp, j["target"], src, dst):
+                print("  %-26s 已修 %s" % (pkg, j["rel"]))
+                n_fix += 1
+            else:
+                n_fail += 1
+    tag = "（预览，加 --yes 执行）" if not args.yes else ""
+    print("\n重定点汇总%s: 修复 %d / 已正确 %d / 跳过 %d / 失败 %d"
+          % (tag, n_fix, n_ok, n_skip, n_fail))
+    return 1 if n_fail else 0
 
 
 def main() -> int:
@@ -473,6 +680,10 @@ def main() -> int:
     sub = ap.add_subparsers(dest="cmd", required=True)
     sub.add_parser("status")
     sub.add_parser("manifest")
+    p_rep = sub.add_parser("repoint",
+                           help="按 pre-manifest 重定点包内 junction（幂等）")
+    p_rep.add_argument("--pkg", default=None)
+    p_rep.add_argument("--yes", action="store_true", help="确认执行")
     p_run = sub.add_parser("run")
     p_run.add_argument("--pkg", default=None)
     p_run.add_argument("--force", action="store_true",
@@ -487,7 +698,8 @@ def main() -> int:
         print("[拒绝] run 需要 --yes 确认（迁移是不可逆原子操作）")
         return 2
     return {"status": cmd_status, "manifest": cmd_manifest,
-            "run": cmd_run, "verify": cmd_verify}[args.cmd](args)
+            "run": cmd_run, "verify": cmd_verify,
+            "repoint": cmd_repoint}[args.cmd](args)
 
 
 if __name__ == "__main__":

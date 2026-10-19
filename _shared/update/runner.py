@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
 r"""runner.py —— 批量驱动「一包一更新脚本」
 
-每个便携包目录里各有一个自包含的 `dist/<Pkg>/update.py`。
+每个便携包目录里各有一个自包含的 `<产品目录>/update.py`
+（迁移前在 `<Repo>/<Pkg>/dist/<Pkg>/`，2026-10-19 起随包到 `<产品根>/<Pkg>/`，
+由 `_paths.product_dir()` 统一解析）。
 本执行器只是「并发地把它们挨个叫起来跑 --check --json，再汇总」，
 自己不实现任何更新逻辑 —— 保证单脚本和批量跑的行为完全一致。
 
@@ -125,8 +127,11 @@ def render(rows, elapsed):
         print("有可用更新，到对应包的便携目录执行即可：")
         for r in up:
             p = r["pkg"]
-            print("  cd %s/dist/%s && python update.py --update --execute"
-                  % (p, p))
+            # 迁移后 update.py 随产品树走，路径必须由 _paths 解析。
+            # 曾硬编码成 <Pkg>/dist/<Pkg>/...，迁移后那个目录已不存在，
+            # 照着提示 cd 过去只会报「系统找不到指定的路径」。
+            print("  cd %s && python update.py --update --execute"
+                  % _paths.product_dir(p))
     else:
         print()
         print("全部已是最新（人工源需自行到官网确认）。")

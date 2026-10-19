@@ -30,9 +30,26 @@
 - 更新策略 `update.py` 脱离仓库后：靠 `PORTABLEAPPS_REPO` 环境变量或向上探测
   定位仓库，找不到退临时目录，脚本永远能跑
 
+### 迁移后复验（同日完成）
+- **39 / 39 全部迁移完成**（含补迁的 WorkBuddyPortable）：
+  596,311 文件 / 60,364 MiB（= 58.95 GiB = 63.30 GB 十进制），`verify` 39 PASS / 0 FAIL
+- 新增 `audit_launcher_freshness.py`：查 exe 是否落后 Custom.nsh、两棵树 Custom.nsh
+  是否一致、是否缺件。首次扫描扫出 2 包 exe 滞后并修好（WorkBuddyPortable
+  自 10-17 搁置、SublimeTextPortable 落后 5.6 小时），现 39/39 新鲜
+- 新增 `migrate_dist.py repoint` 子命令（幂等、可预览），用于修历史损伤与交叉确认
+
+### 修复
+- **junction 重定点整段曾是死代码**：按迁移**前**的路径去 `jp.exists()`，
+  而 rename 之后源树整棵消失 → 恒 False → 全部 continue，一个都没修，
+  工具却报 PASS。改为存 `rel`、执行时用 `dst / rel` 定位
+- 存在性判定 `jp.exists()` → `is_junction(jp)`：前者跟随目标，
+  目标悬空即返回 False，恰好跳过最需要修的 junction
+- 校验只比 junction **数量** → 改为逐个比 `(rel, inside, target_rel)`；
+  此前悬空联接照样判 PASS（真实包上受控复现：旧判定 PASS 假绿、新判定 FAIL）
+- `update/runner.py` 的操作提示仍指向已搬走的 `<Pkg>/dist/<Pkg>`，
+  改为由 `_paths.product_dir()` 解析
+
 ### 已知限制（不阻塞发布）
-- WorkBuddyPortable 因宿主进程占用源树延后迁移，需关闭 WorkBuddy 后执行
-  `migrate_dist.py run --pkg WorkBuddyPortable --yes`（届时自动重定点 2 个包内 junction）
 - CI 自动发布的是**配方包**（git archive + SHA256SUMS + Release Notes），
   不是产品根里的 59 GB 便携产物——后者在仓库外，CI 拿不到也无法构建。
   二进制分发见 `docs/06-开源与发布.md`，接入方法见 `docs/07` §7
