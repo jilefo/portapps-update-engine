@@ -34,7 +34,8 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 TEMPLATE = Path(__file__).resolve().parent / "update_template.py"
 FACTS = REPO_ROOT / "_shared" / "update" / "_facts.json"
 
-G, A, H, M = "github", "api", "html", "manual"
+G, A, H, M, W, C, R = ("github", "api", "html", "manual", "huawei_release",
+                       "cdn_probe", "redirect")
 
 # ------------------------------------------------------------------ 规格表
 SPEC = {
@@ -83,10 +84,17 @@ SPEC = {
         note="实测 2026-10-18：latest=1.23.3b（当前 1.23.2.0，确有更新）。"
              "安装器解出 core/ + setup.exe，正主在 core/（已配 strip_root）"),
 
-    # ============ 探针命中但为假信号，已诚实降级为 manual ==============
+    # ===================== 实测可用的在线源（新增 12 个，2026-10-20）=====
     "TIMPortable": dict(
-        kind=M, pt="nsis", sched="monthly", page="https://tim.qq.com/",
-        note="曾抓到 2.1.1，查上下文是页面 sea.js 的版本号，非 TIM 版本"),
+        kind=A, pt="nsis", sched="monthly",
+        url=("https://jsonschema.qpic.cn/99c2de7e3c0daa2e1eb6fa548bbf0c88"
+             "/d80bde56620e0c005f06232ef2582bfc/versions"),
+        params=None, vf="download_link.windows", uf="download_link.windows",
+        vre=r"TIM([\d.]+)\.exe",
+        note="页面 tim.qq.com/download.html 内 jQuery.ajax 调用的接口，"
+             "需带 Referer。返回 download_link.windows 直链"
+             "（TIM3.5.1.22172.exe，实测 200 / 87.0MB）；"
+             "完整 4 段版本号从直链文件名正则抠（接口里只有 3 段）"),
     "BaiduNetdiskPortable": dict(
         kind=M, pt="nsis", sched="monthly", page="https://pan.baidu.com/download",
         note="曾抓到 2.1.1，查上下文是 badjs-sdk 的版本号"),
@@ -113,53 +121,242 @@ SPEC = {
         note="原配置走蓝奏云文件夹；实测页面无版本号"),
 
     # ===================== 其余：无可靠在线源 =========================
-    "AiPyProPortable": dict(kind=M, pt="electron_installer", sched="monthly"),
-    "CodeArtsAgentPortable": dict(kind=M, pt="electron_installer",
-                                  sched="monthly"),
-    "CodeArtsPortable": dict(kind=M, pt="electron_installer", sched="monthly"),
-    "CodeBuddyCNPortable": dict(kind=M, pt="electron_installer",
-                                sched="monthly",
-                                page="https://copilot.tencent.com/"),
-    "ComatePortable": dict(kind=M, pt="electron_installer", sched="monthly",
-                           page="https://comate.baidu.com/"),
-    "eDiaryPortable": dict(kind=M, pt="zip", sched="yearly"),
-    "JoyCodePortable": dict(kind=M, pt="electron_installer", sched="monthly"),
-    "KukuAIPortable": dict(kind=M, pt="electron_installer", sched="monthly"),
-    "LobsterAIPortable": dict(kind=M, pt="electron_installer",
-                              sched="monthly"),
-    "MiaoshouPortable": dict(kind=M, pt="nsis", sched="monthly"),
-    "MiniMaxCodePortable": dict(kind=M, pt="electron_installer",
-                                sched="monthly"),
-    "OfficeAcePortable": dict(kind=M, pt="nsis", sched="monthly"),
-    "QoderCNIDEPortable": dict(kind=M, pt="electron_installer",
-                               sched="monthly", page="https://qoder.com/"),
-    "QoderCNPortable": dict(kind=M, pt="electron_installer", sched="monthly",
-                            page="https://qoder.com/"),
-    "QQNTPortable": dict(kind=M, pt="nsis", sched="monthly",
-                         page="https://im.qq.com/"),
-    "QQPortable": dict(kind=M, pt="nsis", sched="monthly",
-                       page="https://im.qq.com/pcqq"),
-    "TodayCNPortable": dict(kind=M, pt="electron_installer", sched="monthly"),
-    "TyporaPortable": dict(kind=M, pt="inno", sched="monthly",
-                           page="https://typora.io/",
-                           note="官网下载链接不含版本号，页面也抓不到"),
-    "WeixinPortable": dict(kind=M, pt="nsis", sched="monthly",
-                           page="https://pc.weixin.qq.com/"),
-    "WeMeetPortable": dict(kind=M, pt="nsis", sched="monthly",
-                           page="https://meeting.tencent.com/download"),
-    "WinClawPortable": dict(kind=M, pt="electron_installer", sched="monthly"),
-    "WorkBuddyPortable": dict(kind=M, pt="electron_installer",
-                              sched="monthly"),
+    "AiPyProPortable": dict(
+        kind=M, pt="electron_installer", sched="monthly",
+        page="https://aipy.pro/",
+        note="2026-10-20 复测：aipy.pro 是 SPA，所有路径（/api/version、"
+             "/download、download.aipy.pro/latest.yml）都返回同一份 "
+             "975B HTML；asar 里无明文更新 URL（electron-updater 相关"
+             "命中全是 npmmirror 的包元数据）。"
+             "GitHub 上的 knownsec/aipyapp 是 Python 包（whl/tar.gz），"
+             "非 Windows 桌面安装包，不能用作源"),
+    "CodeArtsAgentPortable": dict(
+        kind=W, pt="electron_installer", sched="monthly",
+        url="https://ide.cn-north-4.myhuaweicloud.com/v1/release-info/latest",
+        subp="ai", arch="X86-64", ostype="windows",
+        note="⚠️sub_product_name 必须是 ai（取自 product.json 的 "
+             "subProductName）；传空/codearts-agent/agent/doer 都返回 "
+             "空 result。实测 version=26.9.902，带 url + hash。"
+             "本地 26.9.901 → 有更新"),
+    "CodeBuddyCNPortable": dict(
+        kind=A, pt="electron_installer", sched="monthly",
+        url="https://copilot.tencent.com/v2/update",
+        params={"platform": "ide-win32-x64-user"},
+        vf="version", uf="url",
+        note="platform 拼装规则来自客户端 out/main.js 的 buildUpdateFeedUrl："
+             "`{updateUrl}/v2/update?platform=ide-{arch}-user`。"
+             "实测 version=4.12.2.41207131 + sha256hash，157.0MB。"
+             "⚠️版本双轨制：product.json 的 genieVersion=1.106.1，"
+             "服务端返回 4 段 genieVersion，两者不可直接比较——"
+             "首次运行需建立基线，之后与上次抓取值比对"),
+    "CodeArtsPortable": dict(
+        kind=W, pt="electron_installer", sched="monthly",
+        url="https://ide.cn-north-4.myhuaweicloud.com/v1/release-info/latest",
+        subp="work", arch="X86-64", ostype="windows",
+        note="实测 2026-10-19：HTTP 200，version=0.2.6，直链 "
+             "CodeArts-0.2.6-fb9a622-x64-prod.exe（带 sha256）；"
+             "接口在客户端 resources/product.json 的 updateUrl，"
+             "current_version 传任意值都返回同一最新版，必须自行比版本"),
+    "ComatePortable": dict(
+        kind=M, pt="electron_installer", sched="monthly",
+        page="https://comate.baidu.com/",
+        note="2026-10-20 复测：product.json 的 updateUrl "
+             "（comate-ide.bj.bcebos.com/updates）只是 dev 模式兜底默认值，"
+             "out/main.js 里另有自定义更新器（走 this.j.request，"
+             "返回体含 url/version/productVersion），但请求 URL 由"
+             "运行时拼装、asar 里无明文。bcebos 桶下列了 9 种 "
+             "latest.yml/RELEASES 路径组合全部 404（桶关闭公开列举）。"
+             "真实更新源未能定位"),
+    "eDiaryPortable": dict(
+        kind=M, pt="zip", sched="yearly",
+        note="2026-10-20 复测：官网域名 haoxueseo.com 可达但 /ediary/ "
+             "路径与 ediary.haoxueseo.com 均连接失败（SSL/连接错误）。"
+             "站点为静态页，未见版本接口或带版本号的下载直链。"
+             "另注：本包 schedule 原为 yearly，eDiary 实际更新极慢，"
+             "保持 yearly 合理"),
+    "JoyCodePortable": dict(
+        kind=M, pt="electron_installer", sched="monthly",
+        page="https://joycode.jd.com/",
+        note="2026-10-20 复测：GitHub 上 jd-opensource/joycode-agent "
+             "releases 返回 404（仓库无 release 或已私有）；"
+             "asar 未找到 app.asar（非标准 Electron 打包结构）。"
+             "官网为京东内部风格 SPA，无可直接调用的版本接口"),
+    "KukuAIPortable": dict(
+        kind=M, pt="electron_installer", sched="monthly",
+        note="2026-10-20 复测：asar 里 electron-updater 关键词有命中"
+             "（autoUpdater/setFeedURL/checkForUpdates），但**无任何"
+             "更新 URL 明文**——feed 地址应为运行时注入或经登录态下发。"
+             "外网域名 kuku.ai / genflow.cn / genflow.pro 均不可达"
+             "（DNS 或连接失败）。产品需登录使用，版本接口很可能带鉴权"),
+    "LobsterAIPortable": dict(
+        kind=G, pt="electron_installer", sched="monthly",
+        repo="netease-youdao/lobsterai",
+        are=r"LobsterAI--win-x64\.exe",
+        note="客户端 resources/app-update.yml 写死 provider: github，"
+             "owner=netease-youdao repo=lobsterai。"
+             "实测 tag=2026.10.16，资产 LobsterAI--win-x64.exe（332.0MB）"
+             "+ SHA256SUMS。本地 2026.10.13 → 有更新"),
+    "QoderCNPortable": dict(
+        kind=A, pt="electron_installer", sched="monthly",
+        url=("https://static.qoder.com.cn/qoder-app/releases/latest.yml"),
+        params=None, vf="version", uf="files.0.url",
+        note="electron-updater generic feed（基址取自客户端 "
+             "resources/app-update.yml + product.json 的 "
+             "desktopUpdateDownloadBaseUrl）。YAML 明文，自带 sha512+sha256；"
+             "实测 version=0.4.8，本地 0.4.4 → 有更新"),
+    "MiaoshouPortable": dict(
+        kind=M, pt="nsis", sched="monthly",
+        note="2026-10-20 复测：妙手（跨境电商ERP），官网需登录。"
+             "GitHub 上 miaoshouai/* 是 Stable Diffusion 辅助工具，"
+             "与桌面客户端无关。未定位到公开版本接口"),
+    "MiniMaxCodePortable": dict(
+        kind=M, pt="electron_installer", sched="monthly",
+        note="2026-10-20 复测：asar 里找到热更新 CDN "
+             "filecdn.minimax.chat/public/minimax-agent/hot-update/zh/prod "
+             "（及 .io 镜像、en/staging/test 变体），但该路径下 "
+             "latest.yml / win32-x64/latest.yml / version.json 全部 404。"
+             "GitHub MiniMax-AI/minimax-code 的 release 只有 CLI 的 "
+             "tar.gz + sha256，非 Windows 桌面安装包。"
+             "桌面版版本源未定位"),
+    "OfficeAcePortable": dict(
+        kind=C, pt="nsis", sched="monthly",
+        cdn="https://res-static.hc-cdn.cn/cloudbu-site/china/zh-cn/OfficeAce",
+        npat="OfficeAce-{version}-windows-x64-setup.exe",
+        # 应用自己写的更新任务状态（taskId 形如 version-1.4.1），
+        # 拿它当探测线索可把常见情况压到 1 次 HEAD
+        hints=[r"Data\settings\local\OfficeClaw\updates\state.json"],
+        hashes={"1.4.1": "a34390dfe3f69a42714583f958d60fb89e4e268fe48c9dc9138f6c2e83be6416"},
+        drop=["Data"]),
+    "QoderCNIDEPortable": dict(
+        kind=M, pt="electron_installer", sched="monthly",
+        page="https://qoder.com/",
+        note="2026-10-20 复测：product.json 的 updateUrl 指向 "
+             "lingma-api.tongyi.aliyun.com/algo（阿里灵码后端），"
+             "实测该路径返回 503。与 QoderCNPortable 不同的是："
+             "IDE 版走阿里云 algo 接口，桌面版走 "
+             "static.qoder.com.cn/qoder-app/releases 的 electron feed。"
+             "IDE 版的更新协议与桌面版不同源，未能复现"),
+    "QQNTPortable": dict(
+        kind=A, pt="nsis", sched="monthly",
+        url=("https://cdn-go.cn/qq-web/im.qq.com_new/latest/rainbow"
+             "/windowsConfig.js"),
+        params=None, vf="ntDownloadUrl", uf="ntDownloadUrl",
+        vre=r"/([\d.]+)/release/",
+        note="与 QQ 共用 windowsConfig.js，取 ntDownloadUrl 字段。"
+             "⚠️本机实测 403：qqfile/QQNTV2/ 前缀被腾讯 EdgeOne WAF "
+             "按出口 IP 封锁（Server: Lego Server），已排除 UA/Referer/"
+             "构建哈希因素。换网络环境很可能即可用；"
+             "另注意 version 字段是 NT 版 4 段号，需从 URL 路径解析"),
+    "QQPortable": dict(
+        kind=A, pt="nsis", sched="monthly",
+        url=("https://cdn-go.cn/qq-web/im.qq.com_new/latest/rainbow"
+             "/windowsConfig.js"),
+        params=None, vf="downloadUrl", uf="downloadUrl",
+        vre=r"/PCQQ[\d.]+/QQ([\d.]+)\.exe",
+        note="页面 im.qq.com/pcqq 内联的 rainbowConfigUrl。"
+             "⚠️坑：配置里的 \"version\" 字段（9.9.36）是 **QQNT** 的版本，"
+             "经典 QQ 已停在 9.7.25.29417；必须从 downloadUrl 路径里解析。"
+             "直链实测 200 / 229207216 B"),
+    "TodayCNPortable": dict(
+        kind=A, pt="electron_installer", sched="monthly",
+        url=("https://releases.todayai.cn/apps/today/desktop/windows-cn"
+             "/release/x64/latest.yml"),
+        params=None, vf="version", uf="path",
+        note="electron-updater generic feed（基址取自客户端 "
+             "resources/app-update.yml）。YAML 明文，自带 sha512 + size；"
+             "实测 version=1.22.1，本地 1.21.5 → 有更新。"
+             "⚠️需 yaml 解析，模板暂按 JSON 处理，此条待补解析器"),
+    "TyporaPortable": dict(
+        kind=M, pt="inno", sched="monthly", page="https://typora.io/",
+        note="⚠️首页的 2024.11.0 是 Cloudflare Beacon 版本，不是 Typora；"
+             "直链 typora-setup-x64.exe 无版本号。真实版本需从 release "
+             "notes 页取，暂降级人工"),
+    "WeixinPortable": dict(
+        kind=H, pt="nsis", sched="monthly",
+        url="https://pc.weixin.qq.com/",
+        vre=(r'WeChatWin_([0-9]+(?:\.[0-9]+)+)\.exe'),
+        note="⚠️坑：页面 HTML 注释里另有 3.9.12（32位旧版），"
+             "裸正则 \\d+\\.\\d+\\.\\d+ 会误抓；必须锚定 WeChatWin_ 文件名。"
+             "实测 4.1.15 / 256569752 B。"
+             "⚠️该模式只从页面 HTML 抠版本号，直链需用 "
+             "download_url_template 拼（见 tmpl 字段）",
+        tmpl=("https://dldir1v6.qq.com/weixin/Universal/Windows"
+              "/WeChatWin_{version}.exe")),
+    "WeMeetPortable": dict(
+        kind=A, pt="nsis", sched="monthly",
+        url=("https://meeting.tencent.com/web-service/query-download-info"),
+        params={"q": '[{"package-type":"app","channel":"0300000000",'
+                     '"platform":"windows","arch":"x86_64"}]'},
+        nonce="nonce", ref="https://meeting.tencent.com/download/",
+        vf="info-list.0.version", uf="info-list.0.url",
+        note="⚠️两个必要参数：channel 必须 0300000000（官网正式版，"
+             "换 1410000197 会拿到国际版旧包）；nonce 随机 16 位十六进制，"
+             "不带会返回 code:1 + 空 info-list（看不出是缺参数）。"
+             "还需带 Referer。"
+             "⚠️坑：下载页 HTML 里的 1.43.5 是 aegis-web-sdk 版本，"
+             "真实版本是 3.46.11.413（目录名级差异）。"
+             "返回体自带 md5 + size，实测 301998824 B"),
+    "WinClawPortable": dict(
+        kind=A, pt="electron_installer", sched="monthly",
+        url=("https://wnt.oss-cn-beijing.aliyuncs.com/winclaw/releases"
+             "/latest/latest.yml"),
+        params=None, vf="version", uf="path",
+        note="electron-updater generic feed（基址取自客户端 "
+             "resources/app-update.yml）。YAML 明文，自带 sha512 + size；"
+             "实测 version=2.6.6，本地 2.5.7 → 有更新。"
+             "⚠️需 yaml 解析，模板暂按 JSON 处理，此条待补解析器"),
+    "WorkBuddyPortable": dict(
+        kind=A, pt="electron_installer", sched="monthly",
+        url="https://copilot.tencent.com/v2/update",
+        params={"platform": "workbuddy-win32-x64-user"},
+        vf="version", uf="url",
+        note="与 CodeBuddy CN 同族接口，platform 前缀换成 workbuddy。"
+             "⚠️版本双轨制：product.json 是 5.8.2，服务端返回 "
+             "5.8.3.41334564（4 段 genieVersion），两者不可直接比。"
+             "返回体带 sha256hash，实测 157.0MB"),
+    "WorkBuddyAIPortable": dict(kind=M, pt="electron_installer",
+                              sched="monthly",
+                              note="manual：官方安装包人工下载；实测 HKLM 自有键 0 条、无服务/驱动，" 
+                                   "监控原始记录见 Other/Source/Monitor"),
     "WPSOfficePortable": dict(kind=M, pt="nsis", sched="monthly",
                               page="https://www.wps.cn/"),
-    "WXWorkPortable": dict(kind=M, pt="nsis", sched="monthly",
-                           page="https://work.weixin.qq.com/"),
-    "ZoomPortable": dict(kind=M, pt="msi", sched="monthly",
-                         page="https://zoom.us/download"),
+    "WXWorkPortable": dict(
+        kind=R, pt="nsis", sched="monthly",
+        url=("https://work.weixin.qq.com/wework_admin/commdownload"
+             "?platform=win&from=wwindex"),
+        vre=r"WeCom_(\d+\.\d+\.\d+\.\d+)\.exe",
+        note="302 重定向即版本接口：Location 为 "
+             "dldir1.qq.com/wework/work_weixin/WeCom_5.0.12.6018.exe"
+             "（实测 200 / 658582280 B）。一次请求同时拿版本+直链。"
+             "⚠️注意：HTML 下载页 work.weixin.qq.com/download 已 404，"
+             "正确入口是 #index_download 的 commdownload 端点"),
+    "ZoomPortable": dict(
+        kind=A, pt="msi", sched="monthly",
+        url="https://zoom.us/rest/download?os=win",
+        vf="result.downloadVO.zoomX64.version",
+        tmpl="https://cdn.zoom.us/prod/{version}/x64/ZoomInstallerFull.exe",
+        note="✅2026-10-20 二次排查后接通（此前误判为不可自动化，已翻案）。"
+             "官网下载页静态 HTML 确实无版本号（Vue 运行时渲染），"
+             "但版本数据来自 https://zoom.us/rest/download?os=win "
+             "（从 meeting-base-V3/js/download.YIwc8fjL.js 挖出的接口）。"
+             "返回 JSON 的 downloadVO.zoomX64.version = 7.2.1.48556 "
+             "（与 zoom.us/download 页面'版本 7.2.1 (48556)'完全一致），"
+             "下载直链按 CDN 规律拼："
+             "https://cdn.zoom.us/prod/{version}/x64/ZoomInstallerFull.exe，"
+             "HEAD 实测 200 / 181560368 B。"
+             ""
+             "⚠️此前'client/latest 是旧版'的结论需要修正表述："
+             "downloadVO.zoom（32 位分支）确实是 6.6.11.23272 且已停更"
+             "（Zoom 公告 2025-12 终止 32 位 Windows 支持），"
+             "/client/latest 别名跟随的就是这个 32 位包；"
+             "x64 版本在 downloadVO.zoomX64，取对字段即为最新。"
+             "⚠️别用 downloadVO.zoom 做源；arm 版字段是 zoomArm64。"),
 }
 
-KIND_CLS = {G: "GithubReleases", A: "ApiJson", H: "HtmlPage", M: "Manual"}
-KIND_SRC = {G: "github_releases", A: "api", H: "html", M: "manual"}
+KIND_CLS = {G: "GithubReleases", A: "ApiJson", H: "HtmlPage", M: "Manual",
+            W: "HuaweiReleaseInfo", C: "CdnProbe", R: "RedirectProbe"}
+KIND_SRC = {G: "github_releases", A: "api", H: "html", M: "manual",
+            W: "api", C: "cdn_probe", R: "redirect"}
 
 
 def esc(s):
@@ -192,8 +389,17 @@ def build_config(spec, app_subdir, entry_exe, disable):
     elif kind == A:
         f.append('    url = "%s"' % spec["url"])
         f.append("    params = %r" % (spec.get("params") or None,))
+        if spec.get("nonce"):
+            f.append('    nonce_param = "%s"' % spec["nonce"])
+        if spec.get("ref"):
+            f.append('    referer = "%s"' % spec["ref"])
         f.append('    version_field = "%s"' % spec["vf"])
-        f.append('    url_field = "%s"' % spec["uf"])
+        if spec.get("tmpl"):
+            # 接口只回版本号时按模板拼直链（Zoom /rest/download），
+            # 支持 {version} 与 {点号路径} 占位符；设了 tmpl 就不回灌 url_field
+            f.append('    url_template = "%s"' % spec["tmpl"])
+        else:
+            f.append('    url_field = "%s"' % spec.get("uf", "downloadUrl"))
         if spec.get("vre"):
             f.append('    version_regex = r"%s"' % spec["vre"])
     elif kind == H:
@@ -201,6 +407,37 @@ def build_config(spec, app_subdir, entry_exe, disable):
         f.append('    version_regex = r"%s"' % spec["vre"])
         if spec.get("tmpl"):
             f.append('    download_url_template = "%s"' % spec["tmpl"])
+    elif kind == W:
+        f.append('    url = "%s"' % spec["url"])
+        f.append('    sub_product_name = "%s"' % spec["subp"])
+        f.append('    arch = "%s"' % spec.get("arch", "X86-64"))
+        f.append('    os_type = "%s"' % spec.get("ostype", "windows"))
+    elif kind == R:
+        # 跟随 302，从 Location 头抠版本号与直链
+        f.append('    url = "%s"' % spec["url"])
+        f.append('    version_regex = r"%s"' % spec["vre"])
+        if spec.get("relbase"):
+            f.append('    base_for_relative = "%s"' % spec["relbase"])
+    elif kind == C:
+        # CDN HEAD 探测：按版本号拼 URL 试存在性
+        f.append('    cdn_base = "%s"' % spec["cdn"])
+        f.append('    name_pattern = "%s"' % spec["npat"])
+        if spec.get("hints"):
+            f.append("    hint_files = [%s]"
+                     % ", ".join("%r" % h for h in spec["hints"]))
+        if spec.get("look"):
+            f.append('    patch_lookahead = %d' % spec["look"])
+        if spec.get("mspan"):
+            f.append('    minor_span = %d' % spec["mspan"])
+        if spec.get("mcap"):
+            f.append('    minor_patch_cap = %d' % spec["mcap"])
+        if spec.get("hashes"):
+            f.append("    known_hashes = {")
+            for ver, sha in spec["hashes"].items():
+                # sha256 长 64 字符，单行放得下（整行约 80 列）
+                f.append('        "%s":' % ver)
+                f.append('            "%s",' % sha)
+            f.append("    }")
     else:
         if spec.get("page"):
             f.append('    download_page = "%s"' % spec["page"])
@@ -223,11 +460,27 @@ def upstream_doc(spec):
     if k == G:
         return ("上游仓库 : %s\n资产匹配 : %s\n" % (spec["repo"], spec["are"]))
     if k == A:
-        return ("接口     : %s\n版本字段 : %s\n直链字段 : %s\n"
-                % (spec["url"], spec["vf"], spec["uf"]))
+        if spec.get("tmpl"):
+            link = "模板     : %s" % spec["tmpl"]
+        else:
+            link = "直链字段 : %s" % spec.get("uf", "downloadUrl")
+        return ("接口     : %s\n版本字段 : %s\n%s\n"
+                % (spec["url"], spec["vf"], link))
     if k == H:
         return ("页面     : %s\n版本正则 : %s\n直链模板 : %s\n"
                 % (spec["url"], spec["vre"], spec.get("tmpl", "（无）")))
+    if k == W:
+        return ("升级接口 : %s\n子产品名 : %s\n平台参数 : %s / %s\n"
+                % (spec["url"], spec["subp"],
+                   spec.get("ostype", "windows"),
+                   spec.get("arch", "X86-64")))
+    if k == R:
+        return ("重定向端点 : %s\n版本正则   : %s\n"
+                % (spec["url"], spec["vre"]))
+    if k == C:
+        return ("CDN 基址 : %s\n命名规则 : %s\n"
+                "探测方式 : HEAD 逐版本试存在性（403 视为未发布）\n"
+                % (spec["cdn"], spec["npat"]))
     return ("下载页   : %s\n" % (spec.get("page") or "（见包 README）"))
 
 
@@ -245,6 +498,15 @@ def doc_header(pkg, spec, sub, entry, cur):
     L.append("程序目录 : App\\%s" % sub)
     L.append("入口     : %s" % entry)
     L.append("生成时版本: %s" % cur)
+    if spec["kind"] == W:
+        L.append("校验     : 上游返回 sha256，下载后强制校验")
+    elif spec.get("hashes"):
+        L.append("校验     : CDN 不提供摘要；SPEC.known_hashes 登记 %d 个版本的"
+                 "sha256，登记则强制校验，其余靠 HTTPS + 解包完整性"
+                 % len(spec["hashes"]))
+    else:
+        L.append("校验     : 上游未提供 sha256，仅靠 HTTPS 传输 + 解包完整性，"
+                 "无内容指纹")
     if spec.get("strip"):
         L.append("程序子目录: 解包后进入 %s/（安装器外层还有 setup.exe 等）"
                  % spec["strip"])
@@ -267,6 +529,9 @@ def doc_header(pkg, spec, sub, entry, cur):
     L.append("安全设计：默认 dry-run；自动备份到")
     L.append("`_shared/update/_backups/%s/`；Data/ 目录永不触碰；失败自动回滚。"
              % pkg)
+    L.append("")
+    L.append("运行环境：Python 3.8+，仅使用标准库；解包 NSIS/Inno/7z 安装器时")
+    L.append("需要外部 7-Zip（缺失时会从 PATH 与 ProgramFiles 环境变量里找）。")
     return "\n".join(L)
 
 
@@ -349,7 +614,7 @@ def main():
             print("[跳过] 产品目录不存在：%s" % out)
             continue
         out.write_text(text, encoding="utf-8")
-        if spec["kind"] != M:
+        if spec["kind"] != M:      # Manual 之外都是自动源（含 CdnProbe）
             n_auto += 1
     print("已生成 %d 个更新脚本 -> <产品目录>/update.py（产品根=%s）"
           % (len(by_pkg), _paths.product_root()))

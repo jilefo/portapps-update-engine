@@ -100,6 +100,16 @@ _shared/tools/_projects_index.json
 #     ↑ 注意：勿在此行后追加行尾注释，Git 不支持行内注释，
 #       整行会被当成 pattern 导致规则静默失效（曾漏 39 条本机绝对路径）。
 
+# 13a. 更新引擎的「产出物」目录（都属于本机运行痕迹，不是开源交付物）
+#      reports  : 每次扫描生成的 update_report-*.md，带本机绝对路径与逐包明细
+#      state    : 断点续跑状态、上次成功版本之类，因机器而异
+#      staging  : 下载中的中间文件，随时可删
+#      evidence : 校验证据 / 截图 / 日志，体积大且只对本机有意义
+_shared/reports/
+_shared/state/
+_shared/staging/
+_shared/evidence/
+
 # 13b. 私人任务书 / 提示词（含本机绝对路径与内部任务框架，不属于开源交付物）
 #      已从 git 移除并备份到仓库外；此规则防止再被 git add -A 误收录
 *提示词*.md

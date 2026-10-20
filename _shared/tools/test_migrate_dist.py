@@ -44,8 +44,8 @@ print("== 1. replace_root_prefix（大小写不敏感）==")
 # 目标小写 d: 匹配不上大写 D: 的前缀 → 原样返回 → 期望值退化成"没替换"。
 # 期望值必须手写常量。
 check("小写盘符目标（前缀被换，其余保留原样）", M.replace_root_prefix(
-    r"d:\Projects\PortableApps\X\dist\X\App",
-    r"D:\Projects\PortableApps\X\dist\X", r"D:\Portapps\X"),
+    r"d:\Sandbox\Repo\X\dist\X\App",
+    r"D:\Sandbox\Repo\X\dist\X", r"D:\Portapps\X"),
     r"D:\Portapps\X\App")
 check("正常大写目标", M.replace_root_prefix(
     r"D:\old\X\App", r"D:\old\X", r"D:\Portapps\X"), r"D:\Portapps\X\App")
@@ -53,8 +53,8 @@ check("不匹配返回 None",
       M.replace_root_prefix(r"E:\other\a", r"D:\x", r"D:\y"), None)
 
 print("\n== 2. _jkey 对老 manifest（无 target_rel）能现推 ==")
-old = {"root": r"D:\Projects\PortableApps\W\dist\W",
-       "junctions": [{"rel": "Data/a", "target": r"D:\Projects\PortableApps\W\dist\W\App\G",
+old = {"root": r"D:\Sandbox\Repo\W\dist\W",
+       "junctions": [{"rel": "Data/a", "target": r"D:\Sandbox\Repo\W\dist\W\App\G",
                       "inside": True}]}
 new = {"root": r"D:\Portapps\W",
        "junctions": [{"rel": "Data/a", "target": r"D:\Portapps\W\App\G",
@@ -93,7 +93,7 @@ check("负样本(树内 junction 迁移后消失)被判 FAIL",
 # 关键反例：树外目标 junction 随冒烟起落，**不应**判负（否则假红 9 包）
 pre_out = {"pkg": "W", "root": r"D:\old\W", "files": {"a": [1, "h"]},
            "junction_count": 1, "total_bytes": 1,
-           "junctions": [{"rel": "Data/c", "target": r"D:\GreenSoftMake\Work\W\App",
+           "junctions": [{"rel": "Data/c", "target": r"D:\Sandbox\Ext\W\App",
                           "inside": False}]}
 post_out = {"pkg": "W", "root": r"D:\Portapps\W", "files": {"a": [1, "h"]},
             "junction_count": 0, "total_bytes": 1, "junctions": []}
